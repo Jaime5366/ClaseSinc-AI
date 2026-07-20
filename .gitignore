@@ -1,0 +1,18 @@
+# Python & Virtual Environment
+venv/
+__pycache__/
+*.pyc
+
+# Secret Environment Variables
+.env
+
+# Temporary & Backup Files
+app_assembled.py
+app_backup_clean.py
+app_restored.py
+diff_output.txt
+temp_*
+test_*
+*.mp3
+*.wav
+*.log
