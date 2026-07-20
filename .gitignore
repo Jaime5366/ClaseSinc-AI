@@ -2,11 +2,18 @@
 venv/
 __pycache__/
 *.pyc
+*.pyo
 
-# Secret Environment Variables
+# Secret Environment Variables (NEVER PUSH TO GITHUB)
 .env
+.env.*
 
-# Temporary & Backup Files
+# Dedicated Local Backups & Historical Saved Data
+backups_locales/
+saved_classes/
+saved_readings/
+
+# Temporary, Test & Working Files
 app_assembled.py
 app_backup_clean.py
 app_restored.py
@@ -15,4 +22,5 @@ temp_*
 test_*
 *.mp3
 *.wav
+*.pdf
 *.log

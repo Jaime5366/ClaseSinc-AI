@@ -212,6 +212,31 @@ def save_class_data(name, summary, docs_extracted, depth):
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
+    # Copia en carpeta dedicada de Respaldos Locales (backups_locales)
+    try:
+        backup_dir = Path(__file__).parent / "backups_locales" / get_active_subject()
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        with open(backup_dir / f"{name}.json", 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"[Backup Notice] {e}")
+
+    # Sincronización automática con Supabase DB y Vectores RAG
+    try:
+        from document_service import create_document, update_document_summary
+        from rag_service import chunk_text, insert_document_chunks
+        active_sub = get_active_subject()
+        doc_title = f"[{active_sub}] {name}"
+        doc = create_document(title=doc_title, file_type="class")
+        doc_id = doc["id"]
+        update_document_summary(doc_id, summary, status="completed")
+        full_content = f"{doc_title}\n\n{summary}\n\n{docs_extracted}"
+        chunks = chunk_text(full_content, chunk_size=800, overlap=100)
+        if chunks:
+            insert_document_chunks(doc_id, chunks)
+    except Exception as e:
+        print(f"[Supabase Sync Notice] {e}")
+
 # Lecturas Helpers
 def list_saved_readings():
     readings_dir = get_readings_dir()
@@ -236,6 +261,31 @@ def save_reading_data(name, filename, pages):
     }
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+
+    # Copia en carpeta dedicada de Respaldos Locales (backups_locales)
+    try:
+        backup_dir = Path(__file__).parent / "backups_locales" / get_active_subject()
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        with open(backup_dir / f"{name}.json", 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"[Backup Notice] {e}")
+
+    # Sincronización automática con Supabase DB y Vectores RAG
+    try:
+        from document_service import create_document, update_document_summary
+        from rag_service import chunk_text, insert_document_chunks
+        active_sub = get_active_subject()
+        doc_title = f"[{active_sub}] {name}"
+        doc = create_document(title=doc_title, file_type="reading")
+        doc_id = doc["id"]
+        reading_text = f"Lectura: {name}\n" + "\n".join([p.get('content', '') for p in pages if isinstance(p, dict)])
+        update_document_summary(doc_id, reading_text, status="completed")
+        chunks = chunk_text(reading_text, chunk_size=800, overlap=100)
+        if chunks:
+            insert_document_chunks(doc_id, chunks)
+    except Exception as e:
+        print(f"[Supabase Sync Notice] {e}")
 
 def get_reading_consolidated_text(r_data, max_chars=80000):
     compiled_pages = []
@@ -3157,13 +3207,27 @@ with tab_chat:
         if r_data:
             r_text = get_reading_consolidated_text(r_data, max_chars=40000)
             compiled_context.append(f"### LECTURA DE APOYO: {r_data['name']}\n{r_text}")
-            
-    if not classes and not readings:
+
+    # Verificar presencia de documentos en Supabase DB
+    supabase_doc_count = 0
+    try:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        res_db = client.table("documents").select("id").ilike("title", f"%[{active_sub}]%").execute()
+        if res_db.data:
+            supabase_doc_count = len(res_db.data)
+    except Exception:
+        supabase_doc_count = 0
+
+    if not classes and not readings and supabase_doc_count == 0:
         st.warning("💡 Esta materia no tiene clases ni lecturas guardadas todavía. Puedes conversar con el Tutor IA, pero sus respuestas serán generales ya que no hay material específico de estudio.")
         subject_context_str = "No hay materiales de estudio específicos cargados."
     else:
         subject_context_str = "\n\n=========================================\n\n".join(compiled_context)
-        st.info(f"📚 Conectado al material de estudio de **{active_sub}** ({len(classes)} clases, {len(readings)} lecturas de apoyo).")
+        if supabase_doc_count > 0:
+            st.info(f"⚡ Conectado a Supabase BD ({supabase_doc_count} documentos y vectores RAG activos para **{active_sub}**).")
+        else:
+            st.info(f"📚 Conectado al material de estudio local de **{active_sub}** ({len(classes)} clases, {len(readings)} lecturas de apoyo).")
 
     if chat_key not in st.session_state:
         st.session_state[chat_key] = []
@@ -3186,12 +3250,36 @@ with tab_chat:
         elif not is_openai and not api_key:
             st.error("🔑 Ingresa una Gemini API Key en el panel lateral.")
         else:
+            # Intentar recuperar fragmentos RAG por similitud vectorial desde Supabase DB
+            rag_snippets = []
+            try:
+                from rag_service import search_similar_chunks
+                from supabase_client import get_supabase_client
+                client = get_supabase_client()
+                res_docs = client.table("documents").select("id, title").ilike("title", f"%[{active_sub}]%").execute()
+                if res_docs.data:
+                    for d in res_docs.data:
+                        matched = search_similar_chunks(d["id"], prompt, top_k=3, api_key=api_key)
+                        for m in matched:
+                            sim = m.get("similarity", 0)
+                            content = m.get("content", "").strip()
+                            if content:
+                                rag_snippets.append(f"📌 [Fuente: {d['title']} | Similitud: {sim:.2f}]:\n{content}")
+            except Exception as e:
+                print(f"[RAG Query Notice] Fallback: {e}")
+                
+            rag_str = "\n\n".join(rag_snippets) if rag_snippets else ""
+            if rag_str:
+                full_context = f"### FRAGMENTOS RECUPERADOS DESDE SUPABASE RAG BD:\n{rag_str}\n\n### MATERIAL DE APOYO ADICIONAL:\n{subject_context_str}"
+            else:
+                full_context = subject_context_str
+
             system_instruction = f"""
 Actúa como un tutor académico de alta competencia en el ámbito universitario. Tu rol es resolver de forma didáctica, clara y rigurosa cualquier duda sobre el material de estudio de la materia activa.
-Tienes acceso al contenido consolidado de la materia activa (resúmenes de clase y lecturas de apoyo) que se te adjunta a continuación. Utilízalo como tu fuente principal de verdad académica.
+Tienes acceso al contenido consolidado de la materia activa y fragmentos vectoriales recuperados de Supabase RAG que se te adjuntan a continuación. Utilízalo como tu fuente principal de verdad académica.
 
 ### CONTEXTO DE LA MATERIA ACTIVA:
-{subject_context_str}
+{full_context}
 
 ### INSTRUCCIONES:
 1. Responde de forma precisa y enfocándote en los conceptos del material.
