@@ -29,6 +29,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Estilo CSS para la pantalla de carga inicial instantánea (evita pantalla negra en blanco)
+st.markdown("""
+<style>
+    /* Loader de Carga Inicial Instantánea en CSS */
+    #root:empty::before, div[data-testid="stAppViewBlockContainer"]:empty::before {
+        content: "🎓 Cargando ClaseSinc AI...";
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        width: 100vw;
+        background: #0f111a;
+        color: #a855f7;
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.8rem;
+        font-weight: 700;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 999999;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Estilo CSS personalizado para lograr una interfaz premium y moderna
 st.markdown("""
 <style>
@@ -112,6 +136,7 @@ migrate_legacy_files()
 def clean_subject_name(name):
     return re.sub(r'[\\/*?:"<>|]', "", name).strip()
 
+@st.cache_data(ttl=10)
 def list_subjects():
     subjects = set()
     
@@ -206,6 +231,7 @@ def get_readings_dir():
     return d
 
 # Clases Helpers
+@st.cache_data(ttl=10)
 def list_saved_classes():
     active_sub = get_active_subject()
     class_names = set()
@@ -302,8 +328,13 @@ def save_class_data(name, summary, docs_extracted, depth):
             insert_document_chunks(doc_id, chunks)
     except Exception as e:
         print(f"[Supabase Sync Notice] {e}")
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
 
 # Lecturas Helpers
+@st.cache_data(ttl=10)
 def list_saved_readings():
     active_sub = get_active_subject()
     reading_names = set()
