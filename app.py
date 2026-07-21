@@ -208,18 +208,20 @@ def get_readings_dir():
 def list_saved_classes():
     active_sub = get_active_subject()
     class_names = set()
+    act_clean = active_sub.strip().lower()
     
     # 1. Supabase DB
     try:
         from supabase_client import get_supabase_client
         client = get_supabase_client()
-        res = client.table("documents").select("title").eq("file_type", "class").ilike("title", f"%[{active_sub}]%").execute()
+        res = client.table("documents").select("title").eq("file_type", "class").execute()
         if res.data:
             for row in res.data:
                 t = row.get("title", "")
-                if "]" in t:
+                if t.startswith("[") and "]" in t:
+                    subj = t[1:t.index("]")].strip().lower()
                     name = t[t.index("]") + 1:].strip()
-                    if name:
+                    if subj == act_clean and name:
                         class_names.add(name)
     except Exception as e:
         print(f"[Supabase list_saved_classes Notice] {e}")
@@ -304,18 +306,20 @@ def save_class_data(name, summary, docs_extracted, depth):
 def list_saved_readings():
     active_sub = get_active_subject()
     reading_names = set()
+    act_clean = active_sub.strip().lower()
     
     # 1. Supabase DB
     try:
         from supabase_client import get_supabase_client
         client = get_supabase_client()
-        res = client.table("documents").select("title").eq("file_type", "reading").ilike("title", f"%[{active_sub}]%").execute()
+        res = client.table("documents").select("title").eq("file_type", "reading").execute()
         if res.data:
             for row in res.data:
                 t = row.get("title", "")
-                if "]" in t:
+                if t.startswith("[") and "]" in t:
+                    subj = t[1:t.index("]")].strip().lower()
                     name = t[t.index("]") + 1:].strip()
-                    if name:
+                    if subj == act_clean and name:
                         reading_names.add(name)
     except Exception as e:
         print(f"[Supabase list_saved_readings Notice] {e}")

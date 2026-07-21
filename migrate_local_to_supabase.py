@@ -77,10 +77,13 @@ def migrate_all_local_data():
                     with open(json_path, "r", encoding="utf-8", errors="ignore") as f:
                         data = json.load(f)
                         
-                    doc_title = f"[{subject}] {data.get('name', 'Lectura sin título')}"
-                    summary_text = data.get("summary", "") or data.get("content", "")
-                    
-                    if not summary_text:
+                    pages = data.get("pages", [])
+                    if isinstance(pages, list) and pages:
+                        summary_text = "\n\n".join([p.get("content", "").strip() for p in pages if isinstance(p, dict) and p.get("content")])
+                    else:
+                        summary_text = data.get("summary", "") or data.get("content", "")
+
+                    if not summary_text or not summary_text.strip():
                         continue
                         
                     # Crear registro de documento
