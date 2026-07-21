@@ -606,15 +606,30 @@ def render_browser_audio_converter_widget():
     </style>
     </head>
     <body>
-    <div class="box" onclick="document.getElementById('vidInp').click()">
+    <div class="box" id="dropBox" onclick="document.getElementById('vidInp').click()">
         <div class="title">⚡ Compresor de Video a Audio (Local en tu Navegador)</div>
-        <div class="desc">Sube aquí tu video MP4, MOV, MKV o audio. Tu navegador extraerá la pista de voz a ~15MB.</div>
-        <input type="file" id="vidInp" accept="video/*,audio/*" style="display:none" onchange="extractAudioDualEngine(this.files[0])">
+        <div class="desc">Haz clic o arrastra aquí cualquier video (MP4, MOV, MKV, AVI) o audio.</div>
+        <button type="button" class="dl-btn" style="background:#6366F1; margin-top:4px; border:none; cursor:pointer;" onclick="event.stopPropagation(); document.getElementById('vidInp').click()">📁 Seleccionar Video o Audio</button>
+        <input type="file" id="vidInp" accept=".mp4,.mov,.mkv,.avi,.webm,.mp3,.wav,.m4a,.aac,.flac,.ogg,video/*,audio/*" style="display:none" onchange="if(this.files.length) extractAudioDualEngine(this.files[0])">
         <div id="stMsg" class="status"></div>
         <div id="dlArea"></div>
     </div>
 
     <script>
+    setTimeout(function() {
+        var box = document.getElementById('dropBox');
+        if (!box) return;
+        box.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); box.style.background = 'rgba(99, 102, 241, 0.25)'; });
+        box.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); box.style.background = 'rgba(99, 102, 241, 0.06)'; });
+        box.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            box.style.background = 'rgba(99, 102, 241, 0.06)';
+            if (e.dataTransfer && e.dataTransfer.files.length) {
+                extractAudioDualEngine(e.dataTransfer.files[0]);
+            }
+        });
+    }, 100);
     function setSt(msg, isErr) {
         var el = document.getElementById('stMsg');
         el.className = 'status' + (isErr ? ' err' : '');
