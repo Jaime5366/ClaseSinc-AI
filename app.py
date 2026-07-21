@@ -2030,35 +2030,41 @@ with tab_process:
                     st.success(f"✅ Texto extraído con éxito de {len(uploaded_docs)} archivo(s) (total de {total_elements} páginas/diapositivas).")
                     
                     # 2. Manejar y optimizar el archivo de audio/video
-                    media_suffix = Path(media_file.name).suffix.lower()
-                    update_full_screen_loader(loader, "Procesando y extrayendo audio de tu grabación...")
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=media_suffix) as temp_media:
-                        temp_media.write(media_file.read())
-                        temp_media_path = temp_media.name
-                    
+                    temp_media_path = None
                     audio_to_upload_path = None
-                    is_video = media_suffix in [".mp4", ".mov", ".avi", ".mkv"]
+                    is_video = False
                     
-                    try:
-                        if is_video:
-                            update_full_screen_loader(loader, "Archivo de video detectado. Extrayendo canal de audio con moviepy...")
-                            temp_audio_extracted = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-                            audio_to_upload_path = temp_audio_extracted.name
-                            temp_audio_extracted.close()
-                            
-                            extract_audio_from_video(temp_media_path, audio_to_upload_path)
-                            st.success("✅ Audio extraído del video de forma correcta.")
-                        else:
-                            audio_to_upload_path = temp_media_path
-                            st.success("✅ Archivo de audio listo para procesamiento.")
-                            
-                    except Exception as e:
-                        st.error(f"❌ Error al procesar el audio/video: {str(e)}")
-                        loader.empty()
-                        st.stop()
-                    finally:
-                        if is_video and os.path.exists(temp_media_path):
-                            os.unlink(temp_media_path)
+                    if media_file:
+                        media_suffix = Path(media_file.name).suffix.lower()
+                        update_full_screen_loader(loader, "Procesando y extrayendo audio de tu grabación...")
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=media_suffix) as temp_media:
+                            while chunk := media_file.read(65536):
+                                temp_media.write(chunk)
+                            temp_media_path = temp_media.name
+                        
+                        is_video = media_suffix in [".mp4", ".mov", ".avi", ".mkv"]
+                        
+                        try:
+                            if is_video:
+                                update_full_screen_loader(loader, "Archivo de video detectado. Extrayendo canal de audio a MP3 ligero con moviepy...")
+                                temp_audio_extracted = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+                                audio_to_upload_path = temp_audio_extracted.name
+                                temp_audio_extracted.close()
+                                
+                                extract_audio_from_video(temp_media_path, audio_to_upload_path)
+                                safe_remove_temp_file(temp_media_path)
+                                temp_media_path = None
+                                st.success("✅ Audio extraído del video de forma correcta.")
+                            else:
+                                audio_to_upload_path = temp_media_path
+                                st.success("✅ Archivo de audio listo para procesamiento.")
+                                
+                        except Exception as e:
+                            st.error(f"❌ Error al procesar el audio/video: {str(e)}")
+                            if temp_media_path:
+                                safe_remove_temp_file(temp_media_path)
+                            loader.empty()
+                            st.stop()
 
                     # 3. Procesamiento y llamada a la API (Google o OpenAI)
                     try:
