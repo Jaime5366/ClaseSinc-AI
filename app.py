@@ -658,8 +658,8 @@ def render_browser_audio_converter_widget():
             var abuf = await file.arrayBuffer();
             setSt("⚡ Decodificando pista de voz...");
             var dec = await actx.decodeAudioData(abuf);
-            setSt("⚙️ Comprimiendo a audio optimizado 16kHz...");
-            var rate = 16000;
+            setSt("⚙️ Comprimiendo a audio optimizado 11kHz...");
+            var rate = 11025;
             var octx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(dec.duration * rate), rate);
             var src = octx.createBufferSource();
             src.buffer = dec;
@@ -687,7 +687,10 @@ def render_browser_audio_converter_widget():
     </body>
     </html>
     """
-    components.html(html_code, height=135)
+    try:
+        st.html(html_code)
+    except Exception:
+        components.html(html_code, height=135)
 
 # Helper para transformar sub-encabezados de nivel 4 (####) en viñetas destacadas (🔹 **Subtema**)
 def clean_markdown_h4_headers(text):
@@ -1922,7 +1925,7 @@ with tab_process:
                 help="Puedes subir múltiples archivos de tipo .pptx y .pdf para complementar la explicación de la clase."
             )
 
-    if media_file and uploaded_docs:
+    if media_file or uploaded_docs:
         st.markdown("<br>", unsafe_allow_html=True)
         
         if not api_key:
@@ -1939,7 +1942,7 @@ with tab_process:
                     docs_extracted = {}
                     total_elements = 0
                     
-                    for doc_file in uploaded_docs:
+                    for doc_file in (uploaded_docs or []):
                         doc_name = doc_file.name
                         doc_suffix = Path(doc_name).suffix.lower()
                         is_pdf_doc = doc_suffix == ".pdf"
