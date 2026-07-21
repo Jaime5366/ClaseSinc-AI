@@ -113,6 +113,23 @@ def clean_subject_name(name):
 
 def list_subjects():
     subjects = set()
+    
+    # 1. Intentar consultar desde Supabase DB
+    try:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        res = client.table("documents").select("title").execute()
+        if res.data:
+            for row in res.data:
+                t = row.get("title", "")
+                if t.startswith("[") and "]" in t:
+                    subj = t[1:t.index("]")].strip()
+                    if subj:
+                        subjects.add(subj)
+    except Exception as e:
+        print(f"[Supabase list_subjects Notice] {e}")
+
+    # 2. Consultar disco local (fallback / dev)
     if DB_DIR.exists():
         for p in DB_DIR.iterdir():
             if p.is_dir():
@@ -121,6 +138,7 @@ def list_subjects():
         for p in READINGS_DIR.iterdir():
             if p.is_dir():
                 subjects.add(p.name)
+                
     if not subjects:
         subjects.add("General")
     return sorted(list(subjects))
@@ -188,15 +206,60 @@ def get_readings_dir():
 
 # Clases Helpers
 def list_saved_classes():
+    active_sub = get_active_subject()
+    class_names = set()
+    
+    # 1. Supabase DB
+    try:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        res = client.table("documents").select("title").eq("file_type", "class").ilike("title", f"%[{active_sub}]%").execute()
+        if res.data:
+            for row in res.data:
+                t = row.get("title", "")
+                if "]" in t:
+                    name = t[t.index("]") + 1:].strip()
+                    if name:
+                        class_names.add(name)
+    except Exception as e:
+        print(f"[Supabase list_saved_classes Notice] {e}")
+
+    # 2. Disco local
     classes_dir = get_classes_dir()
-    return sorted([p.stem for p in classes_dir.glob("*.json")])
+    if classes_dir.exists():
+        for p in classes_dir.glob("*.json"):
+            class_names.add(p.stem)
+            
+    return sorted(list(class_names))
 
 def load_class_data(name):
+    active_sub = get_active_subject()
+    doc_title = f"[{active_sub}] {name}"
+    
+    # 1. Supabase DB
+    try:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        res = client.table("documents").select("*").eq("title", doc_title).execute()
+        if res.data and len(res.data) > 0:
+            row = res.data[0]
+            return {
+                "name": name,
+                "summary": row.get("summary_markdown", ""),
+                "docs_extracted": "",
+                "depth": "Detallado",
+                "date": str(row.get("created_at", ""))
+            }
+    except Exception as e:
+        print(f"[Supabase load_class_data Notice] {e}")
+
+    # 2. Disco local
     classes_dir = get_classes_dir()
     path = classes_dir / f"{name}.json"
     if path.exists():
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
+            
     return None
 
 def save_class_data(name, summary, docs_extracted, depth):
@@ -239,15 +302,60 @@ def save_class_data(name, summary, docs_extracted, depth):
 
 # Lecturas Helpers
 def list_saved_readings():
+    active_sub = get_active_subject()
+    reading_names = set()
+    
+    # 1. Supabase DB
+    try:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        res = client.table("documents").select("title").eq("file_type", "reading").ilike("title", f"%[{active_sub}]%").execute()
+        if res.data:
+            for row in res.data:
+                t = row.get("title", "")
+                if "]" in t:
+                    name = t[t.index("]") + 1:].strip()
+                    if name:
+                        reading_names.add(name)
+    except Exception as e:
+        print(f"[Supabase list_saved_readings Notice] {e}")
+
+    # 2. Disco local
     readings_dir = get_readings_dir()
-    return sorted([p.stem for p in readings_dir.glob("*.json")])
+    if readings_dir.exists():
+        for p in readings_dir.glob("*.json"):
+            reading_names.add(p.stem)
+            
+    return sorted(list(reading_names))
 
 def load_reading_data(name):
+    active_sub = get_active_subject()
+    doc_title = f"[{active_sub}] {name}"
+    
+    # 1. Supabase DB
+    try:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        res = client.table("documents").select("*").eq("title", doc_title).execute()
+        if res.data and len(res.data) > 0:
+            row = res.data[0]
+            summary_txt = row.get("summary_markdown", "")
+            return {
+                "name": name,
+                "filename": f"{name}.pdf",
+                "pages": [{"page_num": 1, "content": summary_txt}],
+                "date": str(row.get("created_at", ""))
+            }
+    except Exception as e:
+        print(f"[Supabase load_reading_data Notice] {e}")
+
+    # 2. Disco local
     readings_dir = get_readings_dir()
     path = readings_dir / f"{name}.json"
     if path.exists():
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
+            
     return None
 
 def save_reading_data(name, filename, pages):
