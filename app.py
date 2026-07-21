@@ -595,11 +595,11 @@ def render_browser_audio_converter_widget():
     <meta charset="utf-8">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: transparent; color: #E2E8F0; margin: 0; padding: 0; }
-        .box { border: 2px dashed #6366F1; border-radius: 10px; padding: 14px; text-align: center; background: rgba(99, 102, 241, 0.06); cursor: pointer; transition: all 0.2s ease; display: block; }
-        .box:hover { background: rgba(99, 102, 241, 0.15); border-color: #818CF8; }
+        .box { border: 2px dashed #6366F1; border-radius: 10px; padding: 14px; text-align: center; background: rgba(99, 102, 241, 0.08); cursor: pointer; transition: all 0.2s ease; display: block; }
+        .box:hover { background: rgba(99, 102, 241, 0.18); border-color: #818CF8; }
         .title { font-weight: 700; font-size: 14px; color: #818CF8; margin-bottom: 4px; }
         .desc { font-size: 11px; color: #94A3B8; margin-bottom: 8px; }
-        .status { margin-top: 8px; font-size: 13px; font-weight: 600; color: #10B981; min-height: 18px; }
+        .status { margin-top: 8px; font-size: 13px; font-weight: 600; color: #10B981; min-height: 20px; }
         .err { color: #EF4444 !important; }
         .dl-btn { display: inline-block; margin-top: 8px; padding: 8px 16px; background: #6366F1; color: white; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 700; transition: background 0.2s; }
         .dl-btn:hover { background: #4F46E5; }
@@ -607,31 +607,21 @@ def render_browser_audio_converter_widget():
     </head>
     <body>
 
+    <label for="vidInp" class="box" id="dropBox">
+        <div class="title">⚡ Compresor de Video a Audio (Navegador Local)</div>
+        <div class="desc">Haz clic o arrastra tu video (MP4, MOV, MKV) o audio para extraer la pista de voz.</div>
+        <span class="dl-btn" id="selectBtn">📁 Seleccionar Video o Audio</span>
+        <input type="file" id="vidInp" accept="video/*,audio/*,.mp4,.mov,.mkv,.avi,.webm,.mp3,.wav,.m4a" style="opacity:0; position:absolute; z-index:-1; width:1px; height:1px;">
+        <div id="stMsg" class="status"></div>
+        <div id="dlArea"></div>
+    </label>
+
     <script>
     function setSt(msg, isErr) {
         var el = document.getElementById('stMsg');
         if (el) {
             el.className = 'status' + (isErr ? ' err' : '');
             el.innerText = msg;
-        }
-    }
-
-    function finishExtraction(file, audioBlob, ext) {
-        var origMb = (file.size / 1024 / 1024).toFixed(1);
-        var wavMb = (audioBlob.size / 1024 / 1024).toFixed(1);
-        setSt("✅ ¡Audio extraído con éxito! " + origMb + " MB ➔ " + wavMb + " MB");
-        
-        var url = URL.createObjectURL(audioBlob);
-        var area = document.getElementById('dlArea');
-        if (area) {
-            area.innerHTML = '';
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = file.name.replace(/\\.[^/.]+$/, "") + "_" + ext;
-            a.className = "dl-btn";
-            a.style.background = "#10B981";
-            a.innerText = "⬇️ DESCARGAR AUDIO OPTIMIZADO (" + wavMb + " MB)";
-            area.appendChild(a);
         }
     }
 
@@ -663,118 +653,90 @@ def render_browser_audio_converter_widget():
         return new Blob([view], { type: 'audio/wav' });
     }
 
-    function processVideoFile(file) {
-        try {
-            setSt("⌛ 1/3 Cargando video: " + file.name + " (" + (file.size/1024/1024).toFixed(1) + " MB)...");
-            var video = document.createElement('video');
-            video.src = URL.createObjectURL(file);
-            video.volume = 0.001;
-            video.preload = "auto";
-            
-            video.onloadedmetadata = function() {
-                try {
-                    setSt("⚡ 2/3 Extrayendo pista de voz a alta velocidad...");
-                    var actx = new (window.AudioContext || window.webkitAudioContext)();
-                    var src = actx.createMediaElementSource(video);
-                    var dest = actx.createMediaStreamDestination();
-                    src.connect(dest);
-                    
-                    var mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm');
-                    var rec = new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 32000 });
-                    var chunks = [];
-                    
-                    rec.ondataavailable = function(e) { if (e.data && e.data.size > 0) chunks.push(e.data); };
-                    rec.onstop = function() {
-                        var audioBlob = new Blob(chunks, { type: mime });
-                        actx.close();
-                        finishExtraction(file, audioBlob, mime.includes('mp4') ? "audio.m4a" : "audio.webm");
-                    };
-                    
-                    video.playbackRate = 16.0;
-                    rec.start(100);
-                    video.play().catch(function() {
-                        video.muted = true;
-                        video.play();
-                    });
-                    
-                    video.onended = function() {
-                        rec.stop();
-                    };
-                } catch(e) {
-                    setSt("❌ Error en stream de audio: " + e.message, true);
-                }
-            };
-            video.onerror = function() {
-                setSt("❌ Error: Formato de video no compatible con tu navegador.", true);
-            };
-        } catch(err) {
-            setSt("❌ Error al procesar video: " + err.message, true);
+    function finishExtraction(file, audioBlob) {
+        var origMb = (file.size / 1024 / 1024).toFixed(1);
+        var wavMb = (audioBlob.size / 1024 / 1024).toFixed(1);
+        setSt("✅ ¡Audio optimizado con éxito! " + origMb + " MB ➔ " + wavMb + " MB");
+        
+        var url = URL.createObjectURL(audioBlob);
+        var area = document.getElementById('dlArea');
+        if (area) {
+            area.innerHTML = '';
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = file.name.replace(/\\.[^/.]+$/, "") + "_audio.wav";
+            a.className = "dl-btn";
+            a.style.background = "#10B981";
+            a.innerText = "⬇️ DESCARGAR AUDIO OPTIMIZADO (" + wavMb + " MB)";
+            area.appendChild(a);
         }
     }
 
-    function processAudioFile(file) {
-        try {
-            setSt("⌛ 1/2 Leyendo archivo de audio: " + file.name + "...");
-            var actx = new (window.AudioContext || window.webkitAudioContext)();
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                setSt("⚡ 2/2 Decodificando pista de voz...");
-                actx.decodeAudioData(e.target.result, function(dec) {
-                    var rate = 11025;
-                    var octx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(dec.duration * rate), rate);
-                    var src = octx.createBufferSource();
-                    src.buffer = dec;
-                    src.connect(octx.destination);
-                    src.start(0);
-                    octx.startRendering().then(function(rend) {
-                        var wav = encodeWAV(rend.getChannelData(0), rate);
-                        finishExtraction(file, wav, "audio.wav");
-                    });
-                }, function(err) {
-                    setSt("❌ Error al decodificar audio: " + (err ? err.message : "formato no soportado"), true);
-                });
-            };
-            reader.readAsArrayBuffer(file);
-        } catch(err) {
-            setSt("❌ Error al leer audio: " + err.message, true);
-        }
-    }
-
-    function handleSelectedFile(file) {
+    function processFileUniversal(file) {
         if (!file) return;
         var area = document.getElementById('dlArea');
         if (area) area.innerHTML = '';
-        var name = file.name.toLowerCase();
-        if (name.endsWith('.mp4') || name.endsWith('.mov') || name.endsWith('.mkv') || name.endsWith('.avi') || name.endsWith('.webm')) {
-            processVideoFile(file);
-        } else {
-            processAudioFile(file);
-        }
+        
+        setSt("⌛ 1/3 Leyendo archivo: " + file.name + " (" + (file.size/1024/1024).toFixed(1) + " MB)...");
+        
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                setSt("⚡ 2/3 Decodificando pista de voz de video/audio...");
+                var actx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                actx.decodeAudioData(e.target.result, function(dec) {
+                    try {
+                        setSt("⚙️ 3/3 Comprimiendo a audio ligero 11kHz...");
+                        var rate = 11025;
+                        var octx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(dec.duration * rate), rate);
+                        var src = octx.createBufferSource();
+                        src.buffer = dec;
+                        src.connect(octx.destination);
+                        src.start(0);
+                        octx.startRendering().then(function(rend) {
+                            var wav = encodeWAV(rend.getChannelData(0), rate);
+                            actx.close();
+                            finishExtraction(file, wav);
+                        }).catch(function(err) {
+                            setSt("❌ Error al renderizar audio: " + err.message, true);
+                        });
+                    } catch(errRender) {
+                        setSt("❌ Error al procesar canales: " + errRender.message, true);
+                    }
+                }, function(errDecode) {
+                    setSt("❌ No se pudo decodificar el video. Intenta subir el video directamente en el cuadro de abajo.", true);
+                });
+            } catch(errActx) {
+                setSt("❌ Error en sistema de audio del navegador: " + errActx.message, true);
+            }
+        };
+        
+        reader.onerror = function() {
+            setSt("❌ Error al leer el archivo desde el disco.", true);
+        };
+        
+        reader.readAsArrayBuffer(file);
     }
-    </script>
 
-    <label for="vidInp" class="box" id="dropBox">
-        <div class="title">⚡ Compresor y Extractor de Audio (Navegador Local)</div>
-        <div class="desc">Haz clic o arrastra tu video (MP4, MOV, MKV, AVI) o audio aquí.</div>
-        <span class="dl-btn">📁 Seleccionar Video o Audio</span>
-        <input type="file" id="vidInp" style="display:none;" onchange="if(this.files && this.files.length) handleSelectedFile(this.files[0])">
-        <div id="stMsg" class="status"></div>
-        <div id="dlArea"></div>
-    </label>
+    document.getElementById('vidInp').addEventListener('change', function(e) {
+        if (e.target.files && e.target.files.length) {
+            processFileUniversal(e.target.files[0]);
+        }
+    });
 
-    <script>
     var box = document.getElementById('dropBox');
     if (box) {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(eventName) {
             box.addEventListener(eventName, function(e) { e.preventDefault(); e.stopPropagation(); }, false);
         });
         box.addEventListener('dragover', function() { box.style.background = 'rgba(99, 102, 241, 0.25)'; });
-        box.addEventListener('dragleave', function() { box.style.background = 'rgba(99, 102, 241, 0.06)'; });
+        box.addEventListener('dragleave', function() { box.style.background = 'rgba(99, 102, 241, 0.08)'; });
         box.addEventListener('drop', function(e) {
-            box.style.background = 'rgba(99, 102, 241, 0.06)';
+            box.style.background = 'rgba(99, 102, 241, 0.08)';
             var dt = e.dataTransfer;
             if (dt && dt.files && dt.files.length) {
-                handleSelectedFile(dt.files[0]);
+                processFileUniversal(dt.files[0]);
             }
         });
     }
@@ -785,7 +747,7 @@ def render_browser_audio_converter_widget():
     try:
         st.html(html_code)
     except Exception:
-        components.html(html_code, height=140)
+        components.html(html_code, height=150)
 
 # Helper para transformar sub-encabezados de nivel 4 (####) en viñetas destacadas (🔹 **Subtema**)
 def clean_markdown_h4_headers(text):
