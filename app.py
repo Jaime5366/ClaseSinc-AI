@@ -608,8 +608,8 @@ def render_browser_audio_converter_widget():
     <body>
     <div class="box" onclick="document.getElementById('vidInp').click()">
         <div class="title">⚡ Compresor de Video a Audio (Local en tu Navegador)</div>
-        <div class="desc">Sube aquí tu video de cualquier tamaño (400MB+). Tu navegador extraerá el audio a ~15MB en 3s.</div>
-        <input type="file" id="vidInp" accept="video/*,audio/*" style="display:none" onchange="extractAudio(this.files[0])">
+        <div class="desc">Sube aquí tu video MP4, MOV, MKV o audio. Tu navegador extraerá la pista de voz a ~15MB.</div>
+        <input type="file" id="vidInp" accept="video/*,audio/*" style="display:none" onchange="extractAudioDualEngine(this.files[0])">
         <div id="stMsg" class="status"></div>
         <div id="dlArea"></div>
     </div>
@@ -649,16 +649,17 @@ def render_browser_audio_converter_widget():
         return new Blob([view], { type: 'audio/wav' });
     }
 
-    async function extractAudio(file) {
+    async function extractAudioDualEngine(file) {
         if (!file) return;
         document.getElementById('dlArea').innerHTML = '';
+        setSt("⌛ Procesando en navegador: " + file.name + " (" + (file.size/1024/1024).toFixed(1) + " MB)...");
+
+        // Motor 1 (AudioContext Directo para MP3/WAV/AAC)
         try {
-            setSt("⌛ Procesando en navegador: " + file.name + " (" + (file.size/1024/1024).toFixed(1) + " MB)...");
             var actx = new (window.AudioContext || window.webkitAudioContext)();
             var abuf = await file.arrayBuffer();
-            setSt("⚡ Decodificando pista de voz...");
             var dec = await actx.decodeAudioData(abuf);
-            setSt("⚙️ Comprimiendo a audio optimizado 11kHz...");
+            setSt("⚙️ Comprimiendo pista de voz a 11kHz...");
             var rate = 11025;
             var octx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(dec.duration * rate), rate);
             var src = octx.createBufferSource();
@@ -667,21 +668,64 @@ def render_browser_audio_converter_widget():
             src.start(0);
             var rend = await octx.startRendering();
             var wav = encodeWAV(rend.getChannelData(0), rate);
-            
-            var origMb = (file.size/1024/1024).toFixed(1);
-            var wavMb = (wav.size/1024/1024).toFixed(1);
-            setSt("✅ ¡Comprimido con éxito! " + origMb + " MB ➔ " + wavMb + " MB");
-            
-            var url = URL.createObjectURL(wav);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = file.name.split('.')[0] + "_audio.wav";
-            a.className = "dl-btn";
-            a.innerText = "⬇️ Guardar Audio Optimizado (" + wavMb + " MB)";
-            document.getElementById('dlArea').appendChild(a);
-        } catch(e) {
-            setSt("❌ Error: " + (e.message || "Formato no soportado"), true);
+            finishExtraction(file, wav, "audio.wav");
+            return;
+        } catch(err1) {
+            console.log("Iniciando Motor 2 HTML5 Video Stream...", err1);
         }
+
+        // Motor 2 (HTML5 Video Stream MediaRecorder para MP4/MOV/MKV/AVI)
+        try {
+            setSt("⚡ Extrayendo pista de voz de video MP4/MOV...");
+            var video = document.createElement('video');
+            video.src = URL.createObjectURL(file);
+            video.volume = 0.001;
+            
+            video.onloadedmetadata = function() {
+                var actx = new (window.AudioContext || window.webkitAudioContext)();
+                var src = actx.createMediaElementSource(video);
+                var dest = actx.createMediaStreamDestination();
+                src.connect(dest);
+                
+                var mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+                var rec = new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 32000 });
+                var chunks = [];
+                
+                rec.ondataavailable = function(e) { if(e.data.size > 0) chunks.push(e.data); };
+                rec.onstop = function() {
+                    var audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                    actx.close();
+                    finishExtraction(file, audioBlob, "audio.webm");
+                };
+                
+                video.playbackRate = 16.0;
+                rec.start(100);
+                video.play();
+                
+                video.onended = function() {
+                    rec.stop();
+                };
+            };
+            video.onerror = function() {
+                setSt("❌ Error: No se pudo leer el formato de video en el navegador.", true);
+            };
+        } catch(err2) {
+            setSt("❌ Error extrayendo audio: " + err2.message, true);
+        }
+    }
+
+    function finishExtraction(file, audioBlob, ext) {
+        var origMb = (file.size/1024/1024).toFixed(1);
+        var wavMb = (audioBlob.size/1024/1024).toFixed(1);
+        setSt("✅ ¡Comprimido con éxito! " + origMb + " MB ➔ " + wavMb + " MB");
+        
+        var url = URL.createObjectURL(audioBlob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = file.name.split('.')[0] + "_" + ext;
+        a.className = "dl-btn";
+        a.innerText = "⬇️ Guardar Audio Optimizado (" + wavMb + " MB)";
+        document.getElementById('dlArea').appendChild(a);
     }
     </script>
     </body>
