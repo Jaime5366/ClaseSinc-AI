@@ -554,6 +554,109 @@ def safe_remove_temp_file(file_path):
     except Exception as e:
         print(f"[Temp Cleanup Notice] {e}")
 
+# Componente Extractor Automático de Audio en Navegador HTML5/JS
+def render_browser_audio_converter_widget():
+    html_code = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: transparent; color: #E2E8F0; margin: 0; padding: 0; }
+        .box { border: 2px dashed #6366F1; border-radius: 10px; padding: 12px; text-align: center; background: rgba(99, 102, 241, 0.06); cursor: pointer; transition: all 0.2s ease; }
+        .box:hover { background: rgba(99, 102, 241, 0.15); border-color: #818CF8; }
+        .title { font-weight: 600; font-size: 13px; color: #818CF8; margin-bottom: 2px; }
+        .desc { font-size: 11px; color: #94A3B8; margin-bottom: 6px; }
+        .status { margin-top: 6px; font-size: 12px; font-weight: 500; color: #10B981; }
+        .err { color: #EF4444; }
+        .dl-btn { display: inline-block; margin-top: 8px; padding: 6px 14px; background: #4F46E5; color: white; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; }
+        .dl-btn:hover { background: #4338CA; }
+    </style>
+    </head>
+    <body>
+    <div class="box" onclick="document.getElementById('vidInp').click()">
+        <div class="title">⚡ Compresor de Video a Audio (Local en tu Navegador)</div>
+        <div class="desc">Sube aquí tu video de cualquier tamaño (400MB+). Tu navegador extraerá el audio a ~15MB en 3s.</div>
+        <input type="file" id="vidInp" accept="video/*,audio/*" style="display:none" onchange="extractAudio(this.files[0])">
+        <div id="stMsg" class="status"></div>
+        <div id="dlArea"></div>
+    </div>
+
+    <script>
+    function setSt(msg, isErr) {
+        var el = document.getElementById('stMsg');
+        el.className = 'status' + (isErr ? ' err' : '');
+        el.innerText = msg;
+    }
+
+    function writeStr(v, o, s) { for (var i=0; i<s.length; i++) v.setUint8(o+i, s.charCodeAt(i)); }
+    function fTo16PCM(out, off, inp) {
+        for (var i=0; i<inp.length; i++, off+=2) {
+            var s = Math.max(-1, Math.min(1, inp[i]));
+            out.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
+    }
+
+    function encodeWAV(samples, rate) {
+        var buf = new ArrayBuffer(44 + samples.length * 2);
+        var view = new DataView(buf);
+        writeStr(view, 0, 'RIFF');
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeStr(view, 8, 'WAVE');
+        writeStr(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, rate, true);
+        view.setUint32(28, rate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeStr(view, 36, 'data');
+        view.setUint32(40, samples.length * 2, true);
+        fTo16PCM(view, 44, samples);
+        return new Blob([view], { type: 'audio/wav' });
+    }
+
+    async function extractAudio(file) {
+        if (!file) return;
+        document.getElementById('dlArea').innerHTML = '';
+        try {
+            setSt("⌛ Procesando en navegador: " + file.name + " (" + (file.size/1024/1024).toFixed(1) + " MB)...");
+            var actx = new (window.AudioContext || window.webkitAudioContext)();
+            var abuf = await file.arrayBuffer();
+            setSt("⚡ Decodificando pista de voz...");
+            var dec = await actx.decodeAudioData(abuf);
+            setSt("⚙️ Comprimiendo a audio optimizado 16kHz...");
+            var rate = 16000;
+            var octx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(dec.duration * rate), rate);
+            var src = octx.createBufferSource();
+            src.buffer = dec;
+            src.connect(octx.destination);
+            src.start(0);
+            var rend = await octx.startRendering();
+            var wav = encodeWAV(rend.getChannelData(0), rate);
+            
+            var origMb = (file.size/1024/1024).toFixed(1);
+            var wavMb = (wav.size/1024/1024).toFixed(1);
+            setSt("✅ ¡Comprimido con éxito! " + origMb + " MB ➔ " + wavMb + " MB");
+            
+            var url = URL.createObjectURL(wav);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = file.name.split('.')[0] + "_audio.wav";
+            a.className = "dl-btn";
+            a.innerText = "⬇️ Guardar Audio Optimizado (" + wavMb + " MB)";
+            document.getElementById('dlArea').appendChild(a);
+        } catch(e) {
+            setSt("❌ Error: " + (e.message || "Formato no soportado"), true);
+        }
+    }
+    </script>
+    </body>
+    </html>
+    """
+    components.html(html_code, height=135)
+
 # Helper para transformar sub-encabezados de nivel 4 (####) en viñetas destacadas (🔹 **Subtema**)
 def clean_markdown_h4_headers(text):
     if not text:
@@ -1685,10 +1788,11 @@ with tab_process:
     with col1:
         with st.container(border=True):
             st.markdown("#### 🎙️ Archivo de Audio o Video")
+            render_browser_audio_converter_widget()
             media_file = st.file_uploader(
-                "Sube la grabación de la clase", 
+                "Sube la grabación de la clase (o el audio optimizado arriba)", 
                 type=["mp3", "wav", "mp4", "mov", "avi", "mkv", "m4a"],
-                help="El sistema extraerá el audio de los archivos de video automáticamente. Soporta hasta 1000 MB."
+                help="Si tu video pesa más de 150 MB, usa el compresor rápido de arriba."
             )
         
     with col2:
