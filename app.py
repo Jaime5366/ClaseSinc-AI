@@ -540,6 +540,16 @@ def extract_audio_from_video(video_path, output_audio_path):
     video.audio.write_audiofile(output_audio_path, bitrate="128k", logger=None)
     video.close()
 
+# Helper para eliminar archivos temporales de forma segura en Windows sin lanzar PermissionError
+def safe_remove_temp_file(file_path):
+    if not file_path:
+        return
+    try:
+        if os.path.exists(file_path):
+            os.unlink(file_path)
+    except Exception as e:
+        print(f"[Temp Cleanup Notice] {e}")
+
 # Helper para transformar sub-encabezados de nivel 4 (####) en viñetas destacadas (🔹 **Subtema**)
 def clean_markdown_h4_headers(text):
     if not text:
@@ -1729,8 +1739,7 @@ with tab_process:
                                 loader.empty()
                                 st.stop()
                             finally:
-                                if os.path.exists(temp_doc_path):
-                                    os.unlink(temp_doc_path)
+                                safe_remove_temp_file(temp_doc_path)
                                     
                     st.session_state.docs_extracted = docs_extracted
                     st.success(f"✅ Texto extraído con éxito de {len(uploaded_docs)} archivo(s) (total de {total_elements} páginas/diapositivas).")
