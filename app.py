@@ -1745,6 +1745,7 @@ with tab_process:
                     st.success(f"✅ Texto extraído con éxito de {len(uploaded_docs)} archivo(s) (total de {total_elements} páginas/diapositivas).")
                     
                     # 2. Manejar y optimizar el archivo de audio/video
+                    media_suffix = Path(media_file.name).suffix.lower()
                     update_full_screen_loader(loader, "Procesando y extrayendo audio de tu grabación...")
                     with tempfile.NamedTemporaryFile(delete=False, suffix=media_suffix) as temp_media:
                         temp_media.write(media_file.read())
