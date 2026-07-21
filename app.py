@@ -744,10 +744,7 @@ def render_browser_audio_converter_widget():
     </body>
     </html>
     """
-    try:
-        st.html(html_code)
-    except Exception:
-        components.html(html_code, height=150)
+    components.html(html_code, height=160)
 
 # Helper para transformar sub-encabezados de nivel 4 (####) en viñetas destacadas (🔹 **Subtema**)
 def clean_markdown_h4_headers(text):
