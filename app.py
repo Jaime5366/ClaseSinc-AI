@@ -1652,7 +1652,8 @@ st.markdown("<h1 class='title-gradient'>ClaseSinc AI 🎓</h1>", unsafe_allow_ht
 st.markdown("<p class='subtitle-text'>Sincronizador inteligente de grabaciones de voz, materiales de apoyo y lecturas complementarias</p>", unsafe_allow_html=True)
 
 # Crear pestañas superiores de navegación
-tab_process, tab_history, tab_study, tab_readings, tab_chat = st.tabs([
+tab_home, tab_process, tab_history, tab_study, tab_readings, tab_chat = st.tabs([
+    "🏠 Inicio",
     "🎙️ Procesar Nueva Clase", 
     "📚 Historial de Clases", 
     "🎓 Zona de Estudio e Integración",
@@ -1681,6 +1682,90 @@ if "extracted_chapter" not in st.session_state:
     st.session_state.extracted_chapter = None
 if "reading_last_action" not in st.session_state:
     st.session_state.reading_last_action = ""
+
+# =====================================================================
+# PESTAÑA 0: INICIO / PANTALLA DE BIENVENIDA HERO DASHBOARD
+# =====================================================================
+with tab_home:
+    st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 50%, rgba(236, 72, 153, 0.1) 100%); 
+                    border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 16px; padding: 24px; margin-bottom: 24px; backdrop-filter: blur(10px);">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                <div>
+                    <span style="background: rgba(139, 92, 246, 0.2); color: #c084fc; font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(192, 132, 252, 0.3); letter-spacing: 0.5px;">SISTEMA ACTIVO • SUPABASE DB + RAG</span>
+                    <h2 style="font-family: 'Outfit', sans-serif; color: #ffffff; font-weight: 700; margin: 10px 0 6px 0; font-size: 1.8rem;">
+                        ¡Bienvenido a ClaseSinc AI! 🎓
+                    </h2>
+                    <p style="color: #cbd5e1; font-size: 0.95rem; margin: 0; max-width: 650px; line-height: 1.5;">
+                        Tu centro inteligente de estudio universitario. Transcribe clases, resume presentaciones, analiza lecturas obligatorias y consulta a tu Tutor IA entrenado con tus propios contenidos.
+                    </p>
+                </div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Métricas y Estadísticas
+    subjects_count = len(list_subjects())
+    classes_count = len(list_saved_classes())
+    readings_count = len(list_saved_readings())
+    
+    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+    with mcol1:
+        st.metric(label="📚 Materias Registradas", value=f"{subjects_count} materia(s)")
+    with mcol2:
+        st.metric(label="🎙️ Clases en Materia Activa", value=f"{classes_count} clase(s)")
+    with mcol3:
+        st.metric(label="📖 Lecturas de Apoyo", value=f"{readings_count} lectura(s)")
+    with mcol4:
+        st.metric(label="⚡ RAG Vectorial", value="Supabase (768-dim)", delta="Conectado 🟢")
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Módulos de Acceso Rápido
+    st.markdown("### 🚀 Accesos Rápidos")
+    qcol1, qcol2, qcol3 = st.columns(3)
+    
+    with qcol1:
+        with st.container(border=True):
+            st.markdown("#### 🎙️ Procesar Clase")
+            st.markdown("Sube audios/videos y diapositivas para generar resúmenes automáticos y mapas conceptuales.")
+            st.info("👉 Pestaña **Procesar Nueva Clase**")
+            
+    with qcol2:
+        with st.container(border=True):
+            st.markdown("#### 📖 Lecturas de Apoyo")
+            st.markdown("Carga libros, capítulos o PDFs complementarios para generar apuntes por capítulo.")
+            st.info("👉 Pestaña **Lecturas de Apoyo**")
+            
+    with qcol3:
+        with st.container(border=True):
+            st.markdown("#### 💬 Tutor IA (Chat)")
+            st.markdown("Haz preguntas en lenguaje natural sobre cualquier tema de tus materias con citas directas.")
+            st.info("👉 Pestaña **Tutor IA (Chat)**")
+            
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Estado de la Materia Activa
+    act_sub = get_active_subject()
+    with st.expander(f"📌 Resumen Rápido de la Materia Activa: **{act_sub}**", expanded=True):
+        scol1, scol2 = st.columns(2)
+        with scol1:
+            st.markdown("##### 🎙️ Clases Registradas")
+            cl_list = list_saved_classes()
+            if cl_list:
+                for cl in cl_list[:5]:
+                    st.markdown(f"• **{cl}**")
+            else:
+                st.caption("No hay clases guardadas en esta materia aún.")
+                
+        with scol2:
+            st.markdown("##### 📖 Lecturas Registradas")
+            rd_list = list_saved_readings()
+            if rd_list:
+                for rd in rd_list[:5]:
+                    st.markdown(f"• **{rd}**")
+            else:
+                st.caption("No hay lecturas guardadas en esta materia aún.")
 
 # =====================================================================
 # PESTAÑA 1: PROCESAR NUEVA CLASE
