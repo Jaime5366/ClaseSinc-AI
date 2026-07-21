@@ -606,14 +606,14 @@ def render_browser_audio_converter_widget():
     </style>
     </head>
     <body>
-    <div class="box" id="dropBox" onclick="document.getElementById('vidInp').click()">
+    <label for="vidInp" class="box" id="dropBox" style="display:block; cursor:pointer;">
         <div class="title">⚡ Compresor de Video a Audio (Local en tu Navegador)</div>
         <div class="desc">Haz clic o arrastra aquí cualquier video (MP4, MOV, MKV, AVI) o audio.</div>
-        <button type="button" class="dl-btn" style="background:#6366F1; margin-top:4px; border:none; cursor:pointer;" onclick="event.stopPropagation(); document.getElementById('vidInp').click()">📁 Seleccionar Video o Audio</button>
-        <input type="file" id="vidInp" accept=".mp4,.mov,.mkv,.avi,.webm,.mp3,.wav,.m4a,.aac,.flac,.ogg,video/*,audio/*" style="display:none" onchange="if(this.files.length) extractAudioDualEngine(this.files[0])">
+        <span class="dl-btn" style="background:#6366F1; margin-top:4px; display:inline-block;">📁 Seleccionar Video o Audio</span>
+        <input type="file" id="vidInp" accept=".mp4,.mov,.mkv,.avi,.webm,.mp3,.wav,.m4a,.aac,.flac,.ogg,video/*,audio/*" style="opacity:0; position:absolute; z-index:-1; width:1px; height:1px;" onchange="if(this.files && this.files.length) extractAudioDualEngine(this.files[0])">
         <div id="stMsg" class="status"></div>
         <div id="dlArea"></div>
-    </div>
+    </label>
 
     <script>
     setTimeout(function() {
