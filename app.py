@@ -1801,6 +1801,7 @@ tab_home, tab_process, tab_history, tab_study, tab_readings, tab_search, tab_cha
     "📚 Historial de Clases", 
     "🎓 Zona de Estudio e Integración",
     "📖 Lecturas de Apoyo",
+    "🔍 Buscador Global (RAG)",
     "💬 Tutor IA (Chat)"
 ])
 
