@@ -256,6 +256,138 @@ def save_chat_history(active_sub, messages):
             json.dump(messages, f, ensure_ascii=False, indent=4)
     except Exception as e:
         print(f"[Save Chat History Notice] {e}")
+def strip_markdown(text):
+    if not text:
+        return ""
+    # Remover encabezados #, ##, etc.
+    t = re.sub(r'#+\s+', '', text)
+    # Remover asteriscos de negrita/cursiva
+    t = re.sub(r'\*+', '', t)
+    # Remover guiones y viñetas
+    t = re.sub(r'^[-\*\+]\s+', '', t, flags=re.MULTILINE)
+    # Remover bloques de código
+    t = re.sub(r'```[\s\S]*?```', '', t)
+    # Remover enlaces markdown
+    t = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', t)
+    # Escapar comillas y saltos de línea para JS
+    t = t.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', '')
+    return t.strip()
+
+def render_tts_player(text, key_suffix=""):
+    clean_text = strip_markdown(text)
+    html_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: transparent; color: #E2E8F0; margin: 0; padding: 0; }}
+        .tts-container {{ background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.2); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-sizing: border-box; }}
+        .title {{ font-size: 13px; font-weight: 600; color: #c084fc; display: flex; align-items: center; gap: 6px; }}
+        .controls {{ display: flex; align-items: center; gap: 8px; }}
+        .btn {{ background: #8b5cf6; border: none; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 4px; }}
+        .btn:hover {{ background: #7c3aed; }}
+        .btn.stop {{ background: #ef4444; }}
+        .btn.stop:hover {{ background: #dc2626; }}
+        .btn.pause {{ background: #f59e0b; }}
+        .btn.pause:hover {{ background: #d97706; }}
+        .slider-container {{ display: flex; align-items: center; gap: 6px; font-size: 11px; color: #94a3b8; }}
+        .slider {{ width: 60px; accent-color: #8b5cf6; }}
+    </style>
+    </head>
+    <body>
+
+    <div class="tts-container">
+        <div class="title">🔊 Lectura en Voz Alta</div>
+        <div class="controls">
+            <button class="btn" id="playBtn" onclick="speakText()">▶️ Leer</button>
+            <button class="btn pause" id="pauseBtn" onclick="pauseText()">⏸️</button>
+            <button class="btn stop" id="stopBtn" onclick="stopText()">⏹️</button>
+            <div class="slider-container">
+                <span>Velocidad:</span>
+                <input type="range" class="slider" id="rateSlider" min="0.8" max="1.6" step="0.1" value="1.0" onchange="updateRate()">
+                <span id="rateVal">1.0x</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    var synth = window.speechSynthesis;
+    var utterance = null;
+    var textToRead = "{clean_text}";
+    var rate = 1.0;
+    var isPaused = false;
+
+    function updateRate() {{
+        rate = parseFloat(document.getElementById('rateSlider').value);
+        document.getElementById('rateVal').innerText = rate.toFixed(1) + 'x';
+        if (synth.speaking && !isPaused) {{
+            synth.cancel();
+            speakText();
+        }}
+    }}
+
+    function speakText() {{
+        if (synth.speaking) {{
+            if (synth.paused) {{
+                synth.resume();
+                isPaused = false;
+                document.getElementById('playBtn').innerText = "▶️ Leyendo";
+                return;
+            }}
+            return;
+        }}
+        
+        utterance = new SpeechSynthesisUtterance(textToRead);
+        utterance.rate = rate;
+        
+        var voices = synth.getVoices();
+        var esVoice = voices.find(function(v) {{ return v.lang.startsWith('es'); }});
+        if (esVoice) utterance.voice = esVoice;
+        
+        utterance.onend = function() {{
+            document.getElementById('playBtn').innerText = "▶️ Leer";
+            isPaused = false;
+        }};
+        
+        utterance.onerror = function() {{
+            document.getElementById('playBtn').innerText = "▶️ Leer";
+            isPaused = false;
+        }};
+        
+        synth.speak(utterance);
+        document.getElementById('playBtn').innerText = "▶️ Leyendo";
+        isPaused = false;
+    }}
+
+    function pauseText() {{
+        if (synth.speaking) {{
+            if (synth.paused) {{
+                synth.resume();
+                isPaused = false;
+                document.getElementById('playBtn').innerText = "▶️ Leyendo";
+            }} else {{
+                synth.pause();
+                isPaused = true;
+                document.getElementById('playBtn').innerText = "▶️ Reanudar";
+            }}
+        }}
+    }}
+
+    function stopText() {{
+        synth.cancel();
+        document.getElementById('playBtn').innerText = "▶️ Leer";
+        isPaused = false;
+    }}
+
+    if (typeof speechSynthesis !== 'undefined' && speechSynthesis.onvoiceschanged !== undefined) {{
+        speechSynthesis.onvoiceschanged = synth.getVoices;
+    }}
+    </script>
+    </body>
+    </html>
+    """
+    components.html(html_code, height=52)
 
 def get_readings_dir():
     subject = get_active_subject()
@@ -2296,6 +2428,10 @@ with tab_history:
                     st.audio(str(audio_local_path), format="audio/mp3")
                     st.markdown("---")
                 
+                # Lector en voz alta TTS
+                render_tts_player(class_data["summary"], key_suffix=f"hist_{class_data['name']}")
+                st.markdown("---")
+                
                 st.markdown(class_data["summary"])
                 
                 try:
@@ -3203,6 +3339,8 @@ Estructura el resumen con un título descriptivo, una introducción corta, el de
                 if st.session_state.reading_summary:
                     st.markdown("---")
                     st.markdown("##### 📝 Resumen Generado:")
+                    render_tts_player(st.session_state.reading_summary, key_suffix=f"read_sum_{selected_reading}")
+                    st.markdown("---")
                     st.markdown(st.session_state.reading_summary)
                     
                     st.markdown("#### 📥 Descargar Resumen de Lectura")
@@ -3301,6 +3439,8 @@ Estructura el resumen con un título descriptivo, una introducción corta, el de
                     bg_color = "#000000"
                     text_color = "#ffff00"
                     
+                render_tts_player(full_reading_text, key_suffix=f"read_easy_{selected_reading}")
+                st.markdown("---")
                 st.markdown(f"""
                 <div style="font-family: {font_style}; font-size: {size_style}; line-height: {spacing_style}; text-align: {align_style}; background-color: {bg_color}; color: {text_color}; padding: 25px; border-radius: 12px; border: 1px solid #ddd; max-height: 500px; overflow-y: auto;">
                 {full_reading_text.replace(chr(10), '<br>')}
