@@ -238,6 +238,25 @@ def get_classes_dir():
     d.mkdir(parents=True, exist_ok=True)
     return d
 
+def load_chat_history(active_sub):
+    path = DB_DIR / active_sub / "_subject_chat.json"
+    if path.exists():
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_chat_history(active_sub, messages):
+    path = DB_DIR / active_sub / "_subject_chat.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(messages, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"[Save Chat History Notice] {e}")
+
 def get_readings_dir():
     subject = get_active_subject()
     d = READINGS_DIR / subject
@@ -305,7 +324,7 @@ def load_class_data(name):
             
     return None
 
-def save_class_data(name, summary, docs_extracted, depth):
+def save_class_data(name, summary, docs_extracted, depth, audio_path=None):
     classes_dir = get_classes_dir()
     path = classes_dir / f"{name}.json"
     data = {
@@ -318,12 +337,26 @@ def save_class_data(name, summary, docs_extracted, depth):
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
+    # Copiar archivo de audio si se proporciona
+    if audio_path and os.path.exists(audio_path):
+        try:
+            import shutil
+            shutil.copy2(audio_path, classes_dir / f"{name}.mp3")
+        except Exception as e:
+            print(f"[Save Audio Notice] {e}")
+
     # Copia en carpeta dedicada de Respaldos Locales (backups_locales)
     try:
         backup_dir = Path(__file__).parent / "backups_locales" / get_active_subject()
         backup_dir.mkdir(parents=True, exist_ok=True)
         with open(backup_dir / f"{name}.json", 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
+        if audio_path and os.path.exists(audio_path):
+            try:
+                import shutil
+                shutil.copy2(audio_path, backup_dir / f"{name}.mp3")
+            except Exception as e:
+                pass
     except Exception as e:
         print(f"[Backup Notice] {e}")
 
@@ -1253,6 +1286,20 @@ def handle_api_error(e):
 
 # Helper para actualizar el overlay de carga en un placeholder
 def update_full_screen_loader(placeholder, message):
+    import random
+    tips = [
+        "💡 <b>Tip de estudio</b>: Aplica la técnica Pomodoro (25 minutos de enfoque total, 5 minutos de descanso) para mantener la concentración.",
+        "💡 <b>Tip de estudio</b>: El Aprendizaje Activo (Active Recall) consiste en hacerte preguntas sobre el material en lugar de solo leerlo.",
+        "💡 <b>Tip de estudio</b>: La repetición espaciada te ayuda a retener información repasando en intervalos de tiempo crecientes.",
+        "💡 <b>Tip de estudio</b>: Explicar un concepto con tus propias palabras (Técnica Feynman) revela lagunas en tu comprensión.",
+        "💡 <b>Tip de estudio</b>: Dormir bien consolida la memoria a largo plazo. ¡No te desveles antes de una entrega importante!",
+        "💡 <b>Tip de estudio</b>: Alternar los temas que estudias (Interleaving) ayuda a tu cerebro a diferenciar conceptos similares.",
+        "🎓 <b>Frase</b>: 'La educación no es la preparación para la vida; la educación es la vida misma.' – John Dewey",
+        "🎓 <b>Frase</b>: 'El aprendizaje nunca agota la mente.' – Leonardo da Vinci",
+        "🎓 <b>Frase</b>: 'Dime y lo olvido, enséñame y lo recuerdo, involúcrame y lo aprendo.' – Benjamin Franklin",
+        "💡 <b>Tip de estudio</b>: Tomar notas a mano fomenta una mejor síntesis y comprensión de las ideas principales."
+    ]
+    random_tip = random.choice(tips)
     placeholder.markdown(f"""
     <div style="
         position: fixed;
@@ -1260,20 +1307,22 @@ def update_full_screen_loader(placeholder, message):
         left: 0;
         width: 100vw;
         height: 100vh;
-        background-color: rgba(15, 17, 26, 0.92);
+        background-color: rgba(15, 17, 26, 0.94);
         z-index: 999999;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         color: #f8fafc;
+        padding: 20px;
+        box-sizing: border-box;
     ">
         <div style="
             border: 8px solid #334155;
             border-top: 8px solid #8b5cf6;
             border-radius: 50%;
-            width: 80px;
-            height: 80px;
+            width: 70px;
+            height: 70px;
             animation: spin 1.5s linear infinite;
             margin-bottom: 25px;
         "></div>
@@ -1283,13 +1332,28 @@ def update_full_screen_loader(placeholder, message):
                 100% {{ transform: rotate(360deg); }}
             }}
         </style>
-        <h3 style="font-family: 'Outfit', sans-serif; font-weight: 600; color: #8b5cf6; margin: 0 0 10px 0; font-size: 1.8rem;">ClaseSinc AI</h3>
-        <p style="font-family: 'Inter', sans-serif; color: #e2e8f0; font-size: 1.2rem; margin: 0 0 5px 0; text-align: center; font-weight: 500;">
+        <h3 style="font-family: 'Outfit', sans-serif; font-weight: 600; color: #8b5cf6; margin: 0 0 10px 0; font-size: 1.8rem; letter-spacing: -0.5px;">ClaseSinc AI</h3>
+        <p style="font-family: 'Inter', sans-serif; color: #e2e8f0; font-size: 1.15rem; margin: 0 0 8px 0; text-align: center; font-weight: 500; max-width: 500px; line-height: 1.4;">
             {message}
         </p>
-        <p style="font-family: 'Inter', sans-serif; color: #94a3b8; font-size: 0.95rem; margin: 0; text-align: center;">
+        <p style="font-family: 'Inter', sans-serif; color: #94a3b8; font-size: 0.9rem; margin: 0 0 25px 0; text-align: center;">
             Por favor, espera. No recargues la página ni cambies de pestaña.
         </p>
+        <div style="
+            font-family: 'Inter', sans-serif;
+            background-color: rgba(139, 92, 246, 0.08);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            padding: 15px 20px;
+            border-radius: 10px;
+            max-width: 480px;
+            text-align: center;
+            font-size: 0.95rem;
+            color: #c084fc;
+            line-height: 1.4;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        ">
+            {random_tip}
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1599,7 +1663,7 @@ st.markdown("<h1 class='title-gradient'>ClaseSinc AI 🎓</h1>", unsafe_allow_ht
 st.markdown("<p class='subtitle-text'>Sincronizador inteligente de grabaciones de voz, materiales de apoyo y lecturas complementarias</p>", unsafe_allow_html=True)
 
 # Crear pestañas superiores de navegación
-tab_home, tab_process, tab_history, tab_study, tab_readings, tab_chat = st.tabs([
+tab_home, tab_process, tab_history, tab_study, tab_readings, tab_search, tab_chat = st.tabs([
     "🏠 Inicio",
     "🎙️ Procesar Nueva Clase", 
     "📚 Historial de Clases", 
@@ -2137,7 +2201,8 @@ with tab_process:
                             name=class_name.strip(),
                             summary=response_text,
                             docs_extracted=docs_extracted,
-                            depth=summary_depth
+                            depth=summary_depth,
+                            audio_path=audio_to_upload_path
                         )
                         st.success(f"🎉 ¡Análisis generado con éxito y guardado en el historial como '{class_name.strip()}'!")
                         
@@ -2145,6 +2210,8 @@ with tab_process:
                         st.error(handle_api_error(e))
                     finally:
                         loader.empty()
+                        if audio_to_upload_path and os.path.exists(audio_to_upload_path):
+                            safe_remove_temp_file(audio_to_upload_path)
                         
         if st.session_state.summary_output:
             st.markdown("---")
@@ -2222,6 +2289,13 @@ with tab_history:
             tab_summary_hist, tab_original_hist = st.tabs(["📝 Resumen de Clase", "📂 Texto de Apoyo Original"])
             
             with tab_summary_hist:
+                # Mostrar reproductor de audio si existe localmente
+                audio_local_path = get_classes_dir() / f"{class_data['name']}.mp3"
+                if audio_local_path.exists():
+                    st.markdown("##### 🔊 Grabación de Audio de la Clase")
+                    st.audio(str(audio_local_path), format="audio/mp3")
+                    st.markdown("---")
+                
                 st.markdown(class_data["summary"])
                 
                 try:
@@ -3442,7 +3516,101 @@ Tu tarea consiste en extraer de forma íntegra, textual y completa únicamente e
                         st.error(f"❌ Error al eliminar la lectura: {str(e)}")
 
 # =====================================================================
-# PESTAÑA 5: TUTOR IA (CHAT CON CONTEXTO CON SOPORTE OPENAI Y GEMINI)
+# PESTAÑA 6: BUSCADOR SEMÁNTICO GLOBAL (RAG)
+# =====================================================================
+with tab_search:
+    st.markdown("### 🔍 Buscador Semántico Global (RAG)")
+    st.markdown("Haz consultas que busquen respuestas de forma simultánea a través de **todas tus clases y lecturas guardadas** utilizando tecnología de vectores de similitud.")
+
+    active_sub = get_active_subject()
+    
+    # Campo de consulta
+    search_query = st.text_input(
+        "¿Qué deseas buscar en tu material de estudio?",
+        placeholder="Ej: ¿Cuáles son las etapas del desarrollo cognitivo según Piaget?",
+        key="search_query_input"
+    )
+    
+    top_k_search = st.slider("Cantidad de fragmentos a recuperar", min_value=3, max_value=10, value=5)
+    
+    if st.button("🔍 Realizar Búsqueda Semántica", key="btn_global_search", use_container_width=True):
+        if not search_query.strip():
+            st.warning("⚠️ Por favor ingresa un texto de consulta.")
+        elif not api_key:
+            st.error("🔑 Ingresa una Gemini API Key en el panel lateral.")
+        else:
+            with st.spinner("Buscando en tus documentos y generando respuesta de síntesis..."):
+                try:
+                    from rag_service import search_similar_chunks_global
+                    from supabase_client import get_supabase_client
+                    
+                    # 1. Recuperar fragmentos
+                    matched_chunks = search_similar_chunks_global(search_query, top_k=top_k_search, api_key=api_key)
+                    
+                    if not matched_chunks:
+                        st.warning("ℹ️ No se encontraron fragmentos con similitud semántica. Asegúrate de tener clases o lecturas procesadas y guardadas.")
+                    else:
+                        # Obtener títulos de documentos
+                        client = get_supabase_client()
+                        doc_ids = list(set([chunk.get("document_id") for chunk in matched_chunks if chunk.get("document_id")]))
+                        doc_titles = {}
+                        if doc_ids:
+                            try:
+                                res_docs = client.table("documents").select("id, title").in_("id", doc_ids).execute()
+                                if res_docs.data:
+                                    doc_titles = {d["id"]: d["title"] for d in res_docs.data}
+                            except Exception:
+                                pass
+                        
+                        # 2. Mostrar respuesta sintetizada por IA
+                        st.markdown("#### 🤖 Respuesta del Asistente Académico")
+                        
+                        snippets_str = []
+                        for idx, chunk in enumerate(matched_chunks):
+                            d_id = chunk.get("document_id")
+                            d_title = doc_titles.get(d_id, "Documento Desconocido")
+                            sim = chunk.get("similarity", 0)
+                            content = chunk.get("content", "").strip()
+                            page = chunk.get("page_number", 1)
+                            snippets_str.append(f"Fragmento {idx+1} [Origen: {d_title} | Pág: {page} | Similitud: {sim:.2f}]:\n{content}")
+                        
+                        full_snippets = "\n\n".join(snippets_str)
+                        
+                        prompt = f"""
+                        Actúa como un tutor académico de alta competencia. Un estudiante ha realizado la siguiente pregunta:
+                        "{search_query}"
+
+                        A continuación, se te proporcionan los fragmentos de texto más relevantes extraídos de sus clases y lecturas de apoyo:
+                        {full_snippets}
+
+                        Por favor, redacta una respuesta coherente, clara, rigurosa y bien estructurada que responda directamente a la pregunta usando principalmente la información provista de las fuentes. Si la información no es suficiente para formular una respuesta completa, indícalo de forma honesta.
+                        """
+                        
+                        genai_client = genai.Client(api_key=api_key)
+                        response = genai_client.models.generate_content(
+                            model=selected_model,
+                            contents=[prompt]
+                        )
+                        
+                        st.write(response.text)
+                        
+                        st.markdown("---")
+                        st.markdown("#### 📂 Fuentes y Fragmentos Recuperados")
+                        for idx, chunk in enumerate(matched_chunks):
+                            d_id = chunk.get("document_id")
+                            d_title = doc_titles.get(d_id, "Documento Desconocido")
+                            sim = chunk.get("similarity", 0)
+                            content = chunk.get("content", "").strip()
+                            page = chunk.get("page_number", 1)
+                            
+                            with st.expander(f"📄 Fragmento {idx+1} (Similitud: {sim:.2f}) - {d_title} (Pág. {page})"):
+                                st.write(content)
+                                
+                except Exception as e:
+                    st.error(f"❌ Error al realizar la búsqueda: {str(e)}")
+
+# =====================================================================
+# PESTAÑA 7: TUTOR IA (CHAT CON CONTEXTO CON SOPORTE OPENAI Y GEMINI)
 # =====================================================================
 with tab_chat:
     active_sub = get_active_subject()
@@ -3455,6 +3623,7 @@ with tab_chat:
         if chat_key in st.session_state and st.session_state[chat_key]:
             if st.button("🗑️ Limpiar Chat", key="btn_clear_chat"):
                 st.session_state[chat_key] = []
+                save_chat_history(active_sub, [])
                 st.rerun()
 
     compiled_context = []
@@ -3493,7 +3662,7 @@ with tab_chat:
             st.info(f"📚 Conectado al material de estudio local de **{active_sub}** ({len(classes)} clases, {len(readings)} lecturas de apoyo).")
 
     if chat_key not in st.session_state:
-        st.session_state[chat_key] = []
+        st.session_state[chat_key] = load_chat_history(active_sub)
 
     chat_container = st.container()
     with chat_container:
@@ -3503,6 +3672,7 @@ with tab_chat:
 
     if prompt := st.chat_input("Escribe tu duda académica sobre esta materia..."):
         st.session_state[chat_key].append({"role": "user", "content": prompt})
+        save_chat_history(active_sub, st.session_state[chat_key])
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
@@ -3564,6 +3734,7 @@ Tienes acceso al contenido consolidado de la materia activa y fragmentos vectori
                         )
                         assistant_response = response.choices[0].message.content
                         st.session_state[chat_key].append({"role": "assistant", "content": assistant_response})
+                        save_chat_history(active_sub, st.session_state[chat_key])
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ Error al consultar a OpenAI: {str(e)}")
@@ -3596,6 +3767,7 @@ Tienes acceso al contenido consolidado de la materia activa y fragmentos vectori
                         )
                         assistant_response = response.text
                         st.session_state[chat_key].append({"role": "assistant", "content": assistant_response})
+                        save_chat_history(active_sub, st.session_state[chat_key])
                         st.rerun()
                     except Exception as e:
                         st.error(handle_api_error(e))

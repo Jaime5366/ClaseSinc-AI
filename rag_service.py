@@ -172,3 +172,46 @@ def search_similar_chunks(
     except Exception as e:
         print(f"[RAGService Error] Error durante la búsqueda por similitud: {e}")
         return []
+
+
+def search_similar_chunks_global(
+    query_text: str,
+    top_k: int = 5,
+    api_key: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Busca los fragmentos más semejantes al query_text a nivel global (todas las clases y lecturas).
+    Paso 1: Transforma query_text en un vector de embedding (dim=768).
+    Paso 2: Realiza la consulta por similitud vectorial global en Supabase (o fallback local).
+    """
+    query_vector = generate_embedding(query_text, api_key=api_key)
+    client = get_supabase_client()
+    
+    # Método A: Intentar llamada RPC nativa a Supabase sin filtrar por ID de documento
+    try:
+        rpc_res = client.rpc("match_document_chunks", {
+            "query_embedding": query_vector,
+            "match_count": top_k
+        }).execute()
+        if rpc_res.data:
+            return rpc_res.data
+    except Exception as e:
+        print(f"[RAGService Notice] RPC nativo match_document_chunks no disponible a nivel global: {e}. Usando fallback local...")
+
+    # Método B: Fallback recuperando fragmentos globales y calculando cosenos localmente
+    try:
+        res = client.table("document_chunks").select("id, document_id, content, page_number, embedding").execute()
+        chunks_data = res.data or []
+        
+        scored_chunks = []
+        for row in chunks_data:
+            emb = row.get("embedding")
+            if isinstance(emb, list) and len(emb) > 0:
+                score = _cosine_similarity(query_vector, emb)
+                scored_chunks.append({**row, "similarity": score})
+                
+        scored_chunks.sort(key=lambda x: x.get("similarity", 0), reverse=True)
+        return scored_chunks[:top_k]
+    except Exception as e:
+        print(f"[RAGService Error] Error durante la búsqueda semántica global: {e}")
+        return []
