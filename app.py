@@ -269,46 +269,157 @@ def strip_markdown(text):
     t = re.sub(r'```[\s\S]*?```', '', t)
     # Remover enlaces markdown
     t = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', t)
-    # Escapar comillas y saltos de línea para JS
-    t = t.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', '')
+    # Escapar comillas y barras para JS
+    t = t.replace('\\', '\\\\').replace('"', '\\"').replace('\r', '')
     return t.strip()
 
 def render_tts_player(text, key_suffix=""):
-    clean_text = strip_markdown(text)
+    clean_text = strip_markdown(text).replace('\n', '\\n')
     html_code = f"""
     <!DOCTYPE html>
     <html>
     <head>
     <meta charset="utf-8">
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: transparent; color: #E2E8F0; margin: 0; padding: 0; }}
-        .tts-container {{ background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.2); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-sizing: border-box; }}
-        .title {{ font-size: 13px; font-weight: 600; color: #c084fc; display: flex; align-items: center; gap: 6px; }}
-        .controls {{ display: flex; align-items: center; gap: 8px; }}
-        .btn {{ background: #8b5cf6; border: none; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 4px; }}
-        .btn:hover {{ background: #7c3aed; }}
-        .btn.stop {{ background: #ef4444; }}
-        .btn.stop:hover {{ background: #dc2626; }}
-        .btn.pause {{ background: #f59e0b; }}
-        .btn.pause:hover {{ background: #d97706; }}
-        .slider-container {{ display: flex; align-items: center; gap: 6px; font-size: 11px; color: #94a3b8; }}
-        .slider {{ width: 60px; accent-color: #8b5cf6; }}
+        body {{
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: transparent;
+            color: #E2E8F0;
+            margin: 0;
+            padding: 0;
+        }}
+        .tts-container {{
+            background: rgba(15, 17, 26, 0.6);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            height: 380px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            backdrop-filter: blur(8px);
+        }}
+        .control-header {{
+            position: sticky;
+            top: 0;
+            background: rgba(15, 17, 26, 0.95);
+            border-bottom: 1px solid rgba(139, 92, 246, 0.25);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            z-index: 10;
+            flex-wrap: wrap;
+        }}
+        .title {{
+            font-size: 13px;
+            font-weight: 700;
+            color: #c084fc;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }}
+        .controls {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }}
+        .btn {{
+            background: #8b5cf6;
+            border: none;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+        .btn:hover {{
+            background: #7c3aed;
+            transform: scale(1.02);
+        }}
+        .btn.pause {{
+            background: #f59e0b;
+        }}
+        .btn.pause:hover {{
+            background: #d97706;
+        }}
+        .btn.stop {{
+            background: #ef4444;
+        }}
+        .btn.stop:hover {{
+            background: #dc2626;
+        }}
+        .control-item {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #94a3b8;
+        }}
+        select {{
+            background: #1e293b;
+            color: #e2e8f0;
+            border: 1px solid #475569;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+            max-width: 145px;
+            cursor: pointer;
+        }}
+        .slider {{
+            width: 60px;
+            accent-color: #8b5cf6;
+            cursor: pointer;
+        }}
+        .text-viewport {{
+            padding: 20px;
+            overflow-y: auto;
+            flex-grow: 1;
+            line-height: 1.8;
+            font-size: 14px;
+            color: #cbd5e1;
+            scroll-behavior: smooth;
+        }}
+        .w {{
+            padding: 1px 2px;
+            border-radius: 3px;
+            transition: background-color 0.15s, color 0.15s;
+        }}
+        .active-word {{
+            background-color: #8b5cf6 !important;
+            color: #ffffff !important;
+            font-weight: 600;
+            box-shadow: 0 0 8px #8b5cf6;
+        }}
     </style>
     </head>
     <body>
 
     <div class="tts-container">
-        <div class="title">🔊 Lectura en Voz Alta</div>
-        <div class="controls">
-            <button class="btn" id="playBtn" onclick="speakText()">▶️ Leer</button>
-            <button class="btn pause" id="pauseBtn" onclick="pauseText()">⏸️</button>
-            <button class="btn stop" id="stopBtn" onclick="stopText()">⏹️</button>
-            <div class="slider-container">
-                <span>Velocidad:</span>
-                <input type="range" class="slider" id="rateSlider" min="0.8" max="1.6" step="0.1" value="1.0" onchange="updateRate()">
-                <span id="rateVal">1.0x</span>
+        <div class="control-header">
+            <div class="title">🔊 Lector Interactivo</div>
+            <div class="controls">
+                <button class="btn" id="playBtn" onclick="speakText()">▶️ Leer</button>
+                <button class="btn pause" id="pauseBtn" onclick="pauseText()">⏸️</button>
+                <button class="btn stop" id="stopBtn" onclick="stopText()">⏹️</button>
+                
+                <div class="control-item">
+                    <span>Narrador:</span>
+                    <select id="voiceSelect" onchange="changeVoice()"></select>
+                </div>
+                
+                <div class="control-item">
+                    <span>Velocidad:</span>
+                    <input type="range" class="slider" id="rateSlider" min="0.8" max="1.6" step="0.1" value="1.0" onchange="updateRate()">
+                    <span id="rateVal">1.0x</span>
+                </div>
             </div>
         </div>
+        <div class="text-viewport" id="textViewport"></div>
     </div>
 
     <script>
@@ -317,6 +428,106 @@ def render_tts_player(text, key_suffix=""):
     var textToRead = "{clean_text}";
     var rate = 1.0;
     var isPaused = false;
+    var wordObjects = [];
+
+    // Construir visor estructurado de palabras
+    function buildViewport() {{
+        var viewport = document.getElementById('textViewport');
+        viewport.innerHTML = '';
+        var paragraphs = textToRead.split('\\\\n');
+        var wordIndex = 0;
+        
+        paragraphs.forEach(function(paraText) {{
+            if (!paraText.trim()) return;
+            var p = document.createElement('p');
+            p.style.margin = '0 0 16px 0';
+            
+            var words = paraText.split(/\\\\s+/);
+            words.forEach(function(word) {{
+                if (!word) return;
+                var span = document.createElement('span');
+                span.className = 'w';
+                span.id = 'w-' + wordIndex;
+                span.innerText = word + ' ';
+                p.appendChild(span);
+                
+                wordObjects.push({{
+                    index: wordIndex,
+                    text: word,
+                    element: span
+                }});
+                wordIndex++;
+            }});
+            viewport.appendChild(p);
+        }});
+    }}
+
+    buildViewport();
+
+    // Re-mapear índices de caracteres
+    var plainTextToRead = wordObjects.map(function(w) {{ return w.text; }}).join(' ');
+    var currentPos = 0;
+    wordObjects.forEach(function(w) {{
+        w.start = plainTextToRead.indexOf(w.text, currentPos);
+        w.end = w.start + w.text.length;
+        currentPos = w.end;
+    }});
+
+    function getWordIndexFromCharIndex(charIndex) {{
+        for (var i = 0; i < wordObjects.length; i++) {{
+            if (charIndex >= wordObjects[i].start && charIndex <= wordObjects[i].end) {{
+                return i;
+            }}
+        }}
+        return -1;
+    }}
+
+    function highlightWord(idx) {{
+        wordObjects.forEach(function(w) {{
+            w.element.classList.remove('active-word');
+        }});
+        if (idx !== -1 && wordObjects[idx]) {{
+            var el = wordObjects[idx].element;
+            el.classList.add('active-word');
+            el.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+        }}
+    }}
+
+    // Voces del sistema
+    function loadVoices() {{
+        var voices = synth.getVoices();
+        var select = document.getElementById('voiceSelect');
+        select.innerHTML = '';
+        
+        var esVoices = voices.filter(function(v) {{ return v.lang.startsWith('es'); }});
+        if (esVoices.length === 0) esVoices = voices;
+        
+        esVoices.forEach(function(v) {{
+            var opt = document.createElement('option');
+            opt.value = v.name;
+            opt.innerText = v.name + ' (' + v.lang + ')';
+            select.appendChild(opt);
+        }});
+        
+        var savedVoice = localStorage.getItem('selected_voice_name');
+        if (savedVoice) {{
+            select.value = savedVoice;
+        }}
+    }}
+
+    if (typeof speechSynthesis !== 'undefined' && speechSynthesis.onvoiceschanged !== undefined) {{
+        speechSynthesis.onvoiceschanged = loadVoices;
+    }}
+    loadVoices();
+
+    function changeVoice() {{
+        var select = document.getElementById('voiceSelect');
+        localStorage.setItem('selected_voice_name', select.value);
+        if (synth.speaking) {{
+            synth.cancel();
+            speakText();
+        }}
+    }}
 
     function updateRate() {{
         rate = parseFloat(document.getElementById('rateSlider').value);
@@ -338,21 +549,31 @@ def render_tts_player(text, key_suffix=""):
             return;
         }}
         
-        utterance = new SpeechSynthesisUtterance(textToRead);
+        utterance = new SpeechSynthesisUtterance(plainTextToRead);
         utterance.rate = rate;
         
         var voices = synth.getVoices();
-        var esVoice = voices.find(function(v) {{ return v.lang.startsWith('es'); }});
-        if (esVoice) utterance.voice = esVoice;
+        var select = document.getElementById('voiceSelect');
+        var selectedVoice = voices.find(function(v) {{ return v.name === select.value; }});
+        if (selectedVoice) utterance.voice = selectedVoice;
+        
+        utterance.onboundary = function(e) {{
+            if (e.name === 'word') {{
+                var idx = getWordIndexFromCharIndex(e.charIndex);
+                highlightWord(idx);
+            }}
+        }};
         
         utterance.onend = function() {{
             document.getElementById('playBtn').innerText = "▶️ Leer";
             isPaused = false;
+            highlightWord(-1);
         }};
         
         utterance.onerror = function() {{
             document.getElementById('playBtn').innerText = "▶️ Leer";
             isPaused = false;
+            highlightWord(-1);
         }};
         
         synth.speak(utterance);
@@ -378,16 +599,13 @@ def render_tts_player(text, key_suffix=""):
         synth.cancel();
         document.getElementById('playBtn').innerText = "▶️ Leer";
         isPaused = false;
-    }}
-
-    if (typeof speechSynthesis !== 'undefined' && speechSynthesis.onvoiceschanged !== undefined) {{
-        speechSynthesis.onvoiceschanged = synth.getVoices;
+        highlightWord(-1);
     }}
     </script>
     </body>
     </html>
     """
-    components.html(html_code, height=52)
+    components.html(html_code, height=400)
 
 def get_readings_dir():
     subject = get_active_subject()
