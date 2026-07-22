@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore", message=".*st.components.v1.html.*")
 import streamlit as st
 import streamlit.components.v1 as components
 import os
