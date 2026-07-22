@@ -176,6 +176,10 @@ def create_subject(name):
     if cleaned:
         (DB_DIR / cleaned).mkdir(parents=True, exist_ok=True)
         (READINGS_DIR / cleaned).mkdir(parents=True, exist_ok=True)
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
         return cleaned
     return None
 
@@ -198,6 +202,10 @@ def rename_subject(old_name, new_name):
     else:
         new_readings.mkdir(parents=True, exist_ok=True)
         
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
     return cleaned_new
 
 def delete_subject(name):
@@ -208,6 +216,10 @@ def delete_subject(name):
         shutil.rmtree(classes_path, ignore_errors=True)
     if readings_path.exists() and readings_path.is_dir():
         shutil.rmtree(readings_path, ignore_errors=True)
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
 
 # Helper para obtener la materia activa de forma persistente
 def get_active_subject():
@@ -432,6 +444,10 @@ def save_reading_data(name, filename, pages):
             insert_document_chunks(doc_id, chunks)
     except Exception as e:
         print(f"[Supabase Sync Notice] {e}")
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
 
 def get_reading_consolidated_text(r_data, max_chars=80000):
     compiled_pages = []
