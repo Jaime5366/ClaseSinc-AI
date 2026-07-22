@@ -384,16 +384,17 @@ def render_tts_player(text, key_suffix=""):
             color: #cbd5e1;
             scroll-behavior: smooth;
         }}
-        .w {{
-            padding: 1px 2px;
-            border-radius: 3px;
-            transition: background-color 0.15s, color 0.15s;
+        .s {{
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: background-color 0.2s, color 0.2s;
         }}
-        .active-word {{
-            background-color: #8b5cf6 !important;
+        .active-sentence {{
+            background-color: rgba(139, 92, 246, 0.25) !important;
             color: #ffffff !important;
-            font-weight: 600;
-            box-shadow: 0 0 8px #8b5cf6;
+            border-left: 3px solid #8b5cf6;
+            padding-left: 6px;
+            font-weight: 500;
         }}
     </style>
     </head>
@@ -430,33 +431,49 @@ def render_tts_player(text, key_suffix=""):
     var isPaused = false;
     var wordObjects = [];
 
-    // Construir visor estructurado de palabras
+    // Construir visor estructurado por oraciones
     function buildViewport() {{
         var viewport = document.getElementById('textViewport');
         viewport.innerHTML = '';
         var paragraphs = textToRead.split('\\\\n');
-        var wordIndex = 0;
+        var sentenceIndex = 0;
         
         paragraphs.forEach(function(paraText) {{
             if (!paraText.trim()) return;
             var p = document.createElement('p');
             p.style.margin = '0 0 16px 0';
             
-            var words = paraText.split(/\\\\s+/);
-            words.forEach(function(word) {{
-                if (!word) return;
+            // Separar párrafo por signos de puntuación + espacio
+            var parts = paraText.split(/([.!?]+\\\\\\\\s+)/);
+            var sentencesInPara = [];
+            for (var i = 0; i < parts.length; i++) {{
+                var val = parts[i];
+                if (!val) continue;
+                if (i % 2 === 1) {{
+                    if (sentencesInPara.length > 0) {{
+                        sentencesInPara[sentencesInPara.length - 1] += val;
+                    }} else {{
+                        sentencesInPara.push(val);
+                    }}
+                }} else {{
+                    sentencesInPara.push(val);
+                }}
+            }}
+            
+            sentencesInPara.forEach(function(sText) {{
+                if (!sText.trim()) return;
                 var span = document.createElement('span');
-                span.className = 'w';
-                span.id = 'w-' + wordIndex;
-                span.innerText = word + ' ';
+                span.className = 's';
+                span.id = 's-' + sentenceIndex;
+                span.innerText = sText;
                 p.appendChild(span);
                 
                 wordObjects.push({{
-                    index: wordIndex,
-                    text: word,
+                    index: sentenceIndex,
+                    text: sText,
                     element: span
                 }});
-                wordIndex++;
+                sentenceIndex++;
             }});
             viewport.appendChild(p);
         }});
@@ -464,8 +481,8 @@ def render_tts_player(text, key_suffix=""):
 
     buildViewport();
 
-    // Re-mapear índices de caracteres
-    var plainTextToRead = wordObjects.map(function(w) {{ return w.text; }}).join(' ');
+    // Mapear posiciones en la cadena unificada de oraciones
+    var plainTextToRead = wordObjects.map(function(w) {{ return w.text; }}).join('');
     var currentPos = 0;
     wordObjects.forEach(function(w) {{
         w.start = plainTextToRead.indexOf(w.text, currentPos);
@@ -475,7 +492,7 @@ def render_tts_player(text, key_suffix=""):
 
     function getWordIndexFromCharIndex(charIndex) {{
         for (var i = 0; i < wordObjects.length; i++) {{
-            if (charIndex >= wordObjects[i].start && charIndex <= wordObjects[i].end) {{
+            if (charIndex >= wordObjects[i].start && charIndex < wordObjects[i].end) {{
                 return i;
             }}
         }}
@@ -484,11 +501,11 @@ def render_tts_player(text, key_suffix=""):
 
     function highlightWord(idx) {{
         wordObjects.forEach(function(w) {{
-            w.element.classList.remove('active-word');
+            w.element.classList.remove('active-sentence');
         }});
         if (idx !== -1 && wordObjects[idx]) {{
             var el = wordObjects[idx].element;
-            el.classList.add('active-word');
+            el.classList.add('active-sentence');
             el.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
         }}
     }}
@@ -558,10 +575,8 @@ def render_tts_player(text, key_suffix=""):
         if (selectedVoice) utterance.voice = selectedVoice;
         
         utterance.onboundary = function(e) {{
-            if (e.name === 'word') {{
-                var idx = getWordIndexFromCharIndex(e.charIndex);
-                highlightWord(idx);
-            }}
+            var idx = getWordIndexFromCharIndex(e.charIndex);
+            highlightWord(idx);
         }};
         
         utterance.onend = function() {{
