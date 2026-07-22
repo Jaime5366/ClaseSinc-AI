@@ -468,7 +468,7 @@ def render_tts_player(text, key_suffix=""):
     function buildViewport() {{
         var viewport = document.getElementById('textViewport');
         viewport.innerHTML = '';
-        var rawWords = textToRead.split(/\\\\s+/);
+        var rawWords = textToRead.split(' ').filter(function(w) {{ return w.trim() !== ''; }});
         pages = [];
         wordObjects = [];
         
@@ -692,6 +692,14 @@ def render_tts_player(text, key_suffix=""):
         isPaused = false;
         highlightWord(-1);
     }}
+
+    // Detener audio inmediatamente si se cierra la ventana modal o se desmonta el componente
+    window.addEventListener('unload', function() {{
+        synth.cancel();
+    }});
+    window.addEventListener('beforeunload', function() {{
+        synth.cancel();
+    }});
     </script>
     </body>
     </html>
@@ -700,6 +708,8 @@ def render_tts_player(text, key_suffix=""):
 
 @st.dialog("📖 Lector Focus Pro", width="large")
 def show_focus_reader_modal(text):
+    st.info("💡 **Modo Lectura Activo**: El texto se divide automáticamente en páginas ajustadas a tu pantalla. La lectura avanzará sola al ritmo del narrador.")
+    st.warning("⚠️ Al cerrar esta ventana, la lectura en voz alta se detendrá automáticamente.")
     render_tts_player(text, key_suffix="modal")
 
 def get_readings_dir():
