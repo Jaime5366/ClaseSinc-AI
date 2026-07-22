@@ -274,7 +274,7 @@ def strip_markdown(text):
     return t.strip()
 
 def render_tts_player(text, key_suffix=""):
-    clean_text = strip_markdown(text).replace('\n', '\\n')
+    clean_text = strip_markdown(text).replace('\n', ' ')
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -289,26 +289,26 @@ def render_tts_player(text, key_suffix=""):
             padding: 0;
         }}
         .tts-container {{
-            background: rgba(15, 17, 26, 0.6);
-            border: 1px solid rgba(139, 92, 246, 0.2);
+            background: rgba(15, 17, 26, 0.85);
+            border: 1px solid rgba(139, 92, 246, 0.25);
             border-radius: 12px;
             display: flex;
             flex-direction: column;
             height: 380px;
             overflow: hidden;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
         }}
         .control-header {{
             position: sticky;
             top: 0;
-            background: rgba(15, 17, 26, 0.95);
-            border-bottom: 1px solid rgba(139, 92, 246, 0.25);
+            background: rgba(15, 17, 26, 0.98);
+            border-bottom: 1px solid rgba(139, 92, 246, 0.3);
             padding: 10px 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
+            gap: 10px;
             z-index: 10;
             flex-wrap: wrap;
         }}
@@ -401,24 +401,24 @@ def render_tts_player(text, key_suffix=""):
             border-color: #8b5cf6;
         }}
         .text-viewport {{
-            padding: 20px;
-            overflow-y: auto;
+            padding: 24px;
+            overflow: hidden;
             flex-grow: 1;
             line-height: 1.8;
-            font-size: 14.5px;
-            color: #cbd5e1;
-            scroll-behavior: smooth;
+            font-size: 15.5px;
+            color: #e2e8f0;
+            box-sizing: border-box;
+            height: 250px;
         }}
         .s {{
-            padding: 2px 4px;
+            padding: 2px 3px;
             border-radius: 4px;
-            transition: background-color 0.2s, color 0.2s;
+            transition: background-color 0.15s, color 0.15s;
         }}
         .active-sentence {{
             background-color: rgba(139, 92, 246, 0.25) !important;
             color: #ffffff !important;
-            border-left: 3px solid #8b5cf6;
-            padding-left: 6px;
+            border-bottom: 2px solid #8b5cf6;
             font-weight: 500;
         }}
     </style>
@@ -427,21 +427,13 @@ def render_tts_player(text, key_suffix=""):
 
     <div class="tts-container">
         <div class="control-header">
-            <div class="title">📖 Focus Reader</div>
+            <div class="title">📖 Lector Focus Pro</div>
             <div class="controls">
                 <button class="btn" id="playBtn" onclick="speakText()">▶️ Leer</button>
                 <button class="btn pause" id="pauseBtn" onclick="pauseText()">⏸️</button>
                 <button class="btn stop" id="stopBtn" onclick="stopText()">⏹️</button>
                 
-                <div class="control-item">
-                    <span>Modo:</span>
-                    <select id="modeSelect" onchange="changeMode()">
-                        <option value="scroll">📜 Continuo</option>
-                        <option value="paged">📖 Páginas</option>
-                    </select>
-                </div>
-                
-                <div class="page-controls" id="pageControls" style="display: none;">
+                <div class="page-controls" id="pageControls">
                     <button class="nav-btn" onclick="prevPage()">◀</button>
                     <span id="pageIndicator" style="font-size: 10px; color: #94a3b8;">Pág. 1/1</span>
                     <button class="nav-btn" onclick="nextPage()">▶</button>
@@ -471,62 +463,63 @@ def render_tts_player(text, key_suffix=""):
     var wordObjects = [];
     var pages = [];
     var currentPage = 0;
-    var mode = 'scroll';
 
-    // Construir visor estructurado por oraciones
+    // Construir visor estructurado por oraciones adaptadas a la altura del viewport
     function buildViewport() {{
         var viewport = document.getElementById('textViewport');
         viewport.innerHTML = '';
-        var paragraphs = textToRead.split('\\\\n');
-        var sentenceIndex = 0;
+        var rawWords = textToRead.split(/\\\\s+/);
         pages = [];
+        wordObjects = [];
         
-        paragraphs.forEach(function(paraText) {{
-            if (!paraText.trim()) return;
-            var p = document.createElement('p');
-            p.style.margin = '0 0 16px 0';
+        var p = document.createElement('p');
+        p.style.margin = '0';
+        viewport.appendChild(p);
+        pages.push(p);
+        
+        var maxViewportHeight = 220; // Altura máxima para evitar scroll en 250px
+        var sentenceIndex = 0;
+        
+        rawWords.forEach(function(word, idx) {{
+            if (!word.trim()) return;
             
-            var parts = paraText.split(/([.!?]+\\\\\\\\s+)/);
-            var sentencesInPara = [];
-            for (var i = 0; i < parts.length; i++) {{
-                var val = parts[i];
-                if (!val) continue;
-                if (i % 2 === 1) {{
-                    if (sentencesInPara.length > 0) {{
-                        sentencesInPara[sentencesInPara.length - 1] += val;
-                    }} else {{
-                        sentencesInPara.push(val);
-                    }}
-                }} else {{
-                    sentencesInPara.push(val);
-                }}
+            var span = document.createElement('span');
+            span.className = 's';
+            span.id = 's-' + idx;
+            span.innerText = word + ' ';
+            p.appendChild(span);
+            
+            // Si el contenedor actual supera la altura máxima, creamos nueva página
+            if (p.offsetHeight > maxViewportHeight) {{
+                p.removeChild(span);
+                
+                p = document.createElement('p');
+                p.style.margin = '0';
+                viewport.appendChild(p);
+                pages.push(p);
+                
+                p.appendChild(span);
             }}
             
-            sentencesInPara.forEach(function(sText) {{
-                if (!sText.trim()) return;
-                var span = document.createElement('span');
-                span.className = 's';
-                span.id = 's-' + sentenceIndex;
-                span.innerText = sText;
-                p.appendChild(span);
-                
-                wordObjects.push({{
-                    index: sentenceIndex,
-                    text: sText,
-                    element: span,
-                    pageIndex: pages.length
-                }});
-                sentenceIndex++;
+            wordObjects.push({{
+                index: idx,
+                text: word,
+                element: span,
+                pageIndex: pages.length - 1,
+                sentenceIndex: sentenceIndex
             }});
-            viewport.appendChild(p);
-            pages.push(p);
+            
+            // Incrementar índice de oración al detectar puntuación final
+            if (word.endsWith('.') || word.endsWith('?') || word.endsWith('!')) {{
+                sentenceIndex++;
+            }}
         }});
     }}
 
     buildViewport();
 
-    // Mapear posiciones en la cadena unificada de oraciones
-    var plainTextToRead = wordObjects.map(function(w) {{ return w.text; }}).join('');
+    // Mapear posiciones en la cadena unificada de lectura
+    var plainTextToRead = wordObjects.map(function(w) {{ return w.text; }}).join(' ');
     var currentPos = 0;
     wordObjects.forEach(function(w) {{
         w.start = plainTextToRead.indexOf(w.text, currentPos);
@@ -536,7 +529,7 @@ def render_tts_player(text, key_suffix=""):
 
     function getWordIndexFromCharIndex(charIndex) {{
         for (var i = 0; i < wordObjects.length; i++) {{
-            if (charIndex >= wordObjects[i].start && charIndex < wordObjects[i].end) {{
+            if (charIndex >= wordObjects[i].start && charIndex <= wordObjects[i].end) {{
                 return i;
             }}
         }}
@@ -547,37 +540,27 @@ def render_tts_player(text, key_suffix=""):
         wordObjects.forEach(function(w) {{
             w.element.classList.remove('active-sentence');
         }});
+        
         if (idx !== -1 && wordObjects[idx]) {{
-            var el = wordObjects[idx].element;
-            el.classList.add('active-sentence');
-            if (mode === 'scroll') {{
-                el.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
-            }}
+            var activeSentence = wordObjects[idx].sentenceIndex;
+            wordObjects.forEach(function(w) {{
+                if (w.sentenceIndex === activeSentence) {{
+                    w.element.classList.add('active-sentence');
+                }}
+            }});
         }}
     }}
 
-    // Alternar Modos de Lectura (Scroll / Paginado)
+    // Cambiar página activa en pantalla
     function updateDisplay() {{
-        var select = document.getElementById('modeSelect');
-        mode = select.value;
-        var pageControls = document.getElementById('pageControls');
-        
-        if (mode === 'scroll') {{
-            pageControls.style.display = 'none';
-            pages.forEach(function(p) {{
+        pages.forEach(function(p, idx) {{
+            if (idx === currentPage) {{
                 p.style.display = 'block';
-            }});
-        }} else {{
-            pageControls.style.display = 'flex';
-            pages.forEach(function(p, idx) {{
-                if (idx === currentPage) {{
-                    p.style.display = 'block';
-                }} else {{
-                    p.style.display = 'none';
-                }}
-            }});
-            document.getElementById('pageIndicator').innerText = 'Pág. ' + (currentPage + 1) + '/' + pages.length;
-        }}
+            }} else {{
+                p.style.display = 'none';
+            }}
+        }});
+        document.getElementById('pageIndicator').innerText = 'Pág. ' + (currentPage + 1) + '/' + pages.length;
     }}
 
     updateDisplay();
@@ -594,10 +577,6 @@ def render_tts_player(text, key_suffix=""):
             currentPage--;
             updateDisplay();
         }}
-    }}
-
-    function changeMode() {{
-        updateDisplay();
     }}
 
     // Voces del sistema
@@ -668,7 +647,7 @@ def render_tts_player(text, key_suffix=""):
             var idx = getWordIndexFromCharIndex(e.charIndex);
             if (idx !== -1 && wordObjects[idx]) {{
                 var targetPage = wordObjects[idx].pageIndex;
-                if (mode === 'paged' && targetPage !== currentPage) {{
+                if (targetPage !== currentPage) {{
                     currentPage = targetPage;
                     updateDisplay();
                 }}
@@ -718,6 +697,10 @@ def render_tts_player(text, key_suffix=""):
     </html>
     """
     components.html(html_code, height=400)
+
+@st.dialog("📖 Lector Focus Pro", width="large")
+def show_focus_reader_modal(text):
+    render_tts_player(text, key_suffix="modal")
 
 def get_readings_dir():
     subject = get_active_subject()
@@ -2759,8 +2742,9 @@ with tab_history:
                     st.audio(str(audio_local_path), format="audio/mp3")
                     st.markdown("---")
                 
-                # Lector en voz alta TTS
-                render_tts_player(class_data["summary"], key_suffix=f"hist_{class_data['name']}")
+                # Lector en voz alta TTS en Modal Focus
+                if st.button("🔊 Escuchar Resumen (Modo Focus)", key=f"btn_focus_hist_{class_data['name']}", use_container_width=True):
+                    show_focus_reader_modal(class_data["summary"])
                 st.markdown("---")
                 
                 st.markdown(class_data["summary"])
@@ -3670,7 +3654,8 @@ Estructura el resumen con un título descriptivo, una introducción corta, el de
                 if st.session_state.reading_summary:
                     st.markdown("---")
                     st.markdown("##### 📝 Resumen Generado:")
-                    render_tts_player(st.session_state.reading_summary, key_suffix=f"read_sum_{selected_reading}")
+                    if st.button("🔊 Escuchar Resumen (Modo Focus)", key=f"btn_focus_read_sum_{selected_reading}", use_container_width=True):
+                        show_focus_reader_modal(st.session_state.reading_summary)
                     st.markdown("---")
                     st.markdown(st.session_state.reading_summary)
                     
@@ -3770,7 +3755,8 @@ Estructura el resumen con un título descriptivo, una introducción corta, el de
                     bg_color = "#000000"
                     text_color = "#ffff00"
                     
-                render_tts_player(full_reading_text, key_suffix=f"read_easy_{selected_reading}")
+                if st.button("🔊 Escuchar Lectura Completa (Modo Focus)", key=f"btn_focus_read_easy_{selected_reading}", use_container_width=True):
+                    show_focus_reader_modal(full_reading_text)
                 st.markdown("---")
                 st.markdown(f"""
                 <div style="font-family: {font_style}; font-size: {size_style}; line-height: {spacing_style}; text-align: {align_style}; background-color: {bg_color}; color: {text_color}; padding: 25px; border-radius: 12px; border: 1px solid #ddd; max-height: 500px; overflow-y: auto;">
