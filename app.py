@@ -304,11 +304,11 @@ def render_tts_player(text, key_suffix=""):
             top: 0;
             background: rgba(15, 17, 26, 0.95);
             border-bottom: 1px solid rgba(139, 92, 246, 0.25);
-            padding: 12px 16px;
+            padding: 10px 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 16px;
+            gap: 12px;
             z-index: 10;
             flex-wrap: wrap;
         }}
@@ -323,14 +323,14 @@ def render_tts_player(text, key_suffix=""):
         .controls {{
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             flex-wrap: wrap;
         }}
         .btn {{
             background: #8b5cf6;
             border: none;
             color: white;
-            padding: 6px 14px;
+            padding: 6px 12px;
             border-radius: 6px;
             font-size: 11px;
             font-weight: 600;
@@ -356,7 +356,7 @@ def render_tts_player(text, key_suffix=""):
         .control-item {{
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
             font-size: 11px;
             color: #94a3b8;
         }}
@@ -365,22 +365,47 @@ def render_tts_player(text, key_suffix=""):
             color: #e2e8f0;
             border: 1px solid #475569;
             border-radius: 4px;
-            padding: 4px 8px;
+            padding: 4px 6px;
             font-size: 11px;
-            max-width: 145px;
+            max-width: 130px;
             cursor: pointer;
         }}
         .slider {{
-            width: 60px;
+            width: 50px;
             accent-color: #8b5cf6;
             cursor: pointer;
+        }}
+        .page-controls {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(30, 41, 59, 0.8);
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(139, 92, 246, 0.25);
+        }}
+        .nav-btn {{
+            background: #1e293b;
+            border: 1px solid #475569;
+            color: #cbd5e1;
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }}
+        .nav-btn:hover {{
+            background: #8b5cf6;
+            color: #ffffff;
+            border-color: #8b5cf6;
         }}
         .text-viewport {{
             padding: 20px;
             overflow-y: auto;
             flex-grow: 1;
             line-height: 1.8;
-            font-size: 14px;
+            font-size: 14.5px;
             color: #cbd5e1;
             scroll-behavior: smooth;
         }}
@@ -402,19 +427,33 @@ def render_tts_player(text, key_suffix=""):
 
     <div class="tts-container">
         <div class="control-header">
-            <div class="title">🔊 Lector Interactivo</div>
+            <div class="title">📖 Focus Reader</div>
             <div class="controls">
                 <button class="btn" id="playBtn" onclick="speakText()">▶️ Leer</button>
                 <button class="btn pause" id="pauseBtn" onclick="pauseText()">⏸️</button>
                 <button class="btn stop" id="stopBtn" onclick="stopText()">⏹️</button>
                 
                 <div class="control-item">
-                    <span>Narrador:</span>
+                    <span>Modo:</span>
+                    <select id="modeSelect" onchange="changeMode()">
+                        <option value="scroll">📜 Continuo</option>
+                        <option value="paged">📖 Páginas</option>
+                    </select>
+                </div>
+                
+                <div class="page-controls" id="pageControls" style="display: none;">
+                    <button class="nav-btn" onclick="prevPage()">◀</button>
+                    <span id="pageIndicator" style="font-size: 10px; color: #94a3b8;">Pág. 1/1</span>
+                    <button class="nav-btn" onclick="nextPage()">▶</button>
+                </div>
+
+                <div class="control-item">
+                    <span>Voz:</span>
                     <select id="voiceSelect" onchange="changeVoice()"></select>
                 </div>
                 
                 <div class="control-item">
-                    <span>Velocidad:</span>
+                    <span>Vel:</span>
                     <input type="range" class="slider" id="rateSlider" min="0.8" max="1.6" step="0.1" value="1.0" onchange="updateRate()">
                     <span id="rateVal">1.0x</span>
                 </div>
@@ -430,6 +469,9 @@ def render_tts_player(text, key_suffix=""):
     var rate = 1.0;
     var isPaused = false;
     var wordObjects = [];
+    var pages = [];
+    var currentPage = 0;
+    var mode = 'scroll';
 
     // Construir visor estructurado por oraciones
     function buildViewport() {{
@@ -437,13 +479,13 @@ def render_tts_player(text, key_suffix=""):
         viewport.innerHTML = '';
         var paragraphs = textToRead.split('\\\\n');
         var sentenceIndex = 0;
+        pages = [];
         
         paragraphs.forEach(function(paraText) {{
             if (!paraText.trim()) return;
             var p = document.createElement('p');
             p.style.margin = '0 0 16px 0';
             
-            // Separar párrafo por signos de puntuación + espacio
             var parts = paraText.split(/([.!?]+\\\\\\\\s+)/);
             var sentencesInPara = [];
             for (var i = 0; i < parts.length; i++) {{
@@ -471,11 +513,13 @@ def render_tts_player(text, key_suffix=""):
                 wordObjects.push({{
                     index: sentenceIndex,
                     text: sText,
-                    element: span
+                    element: span,
+                    pageIndex: pages.length
                 }});
                 sentenceIndex++;
             }});
             viewport.appendChild(p);
+            pages.push(p);
         }});
     }}
 
@@ -506,8 +550,54 @@ def render_tts_player(text, key_suffix=""):
         if (idx !== -1 && wordObjects[idx]) {{
             var el = wordObjects[idx].element;
             el.classList.add('active-sentence');
-            el.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+            if (mode === 'scroll') {{
+                el.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+            }}
         }}
+    }}
+
+    // Alternar Modos de Lectura (Scroll / Paginado)
+    function updateDisplay() {{
+        var select = document.getElementById('modeSelect');
+        mode = select.value;
+        var pageControls = document.getElementById('pageControls');
+        
+        if (mode === 'scroll') {{
+            pageControls.style.display = 'none';
+            pages.forEach(function(p) {{
+                p.style.display = 'block';
+            }});
+        }} else {{
+            pageControls.style.display = 'flex';
+            pages.forEach(function(p, idx) {{
+                if (idx === currentPage) {{
+                    p.style.display = 'block';
+                }} else {{
+                    p.style.display = 'none';
+                }}
+            }});
+            document.getElementById('pageIndicator').innerText = 'Pág. ' + (currentPage + 1) + '/' + pages.length;
+        }}
+    }}
+
+    updateDisplay();
+
+    function nextPage() {{
+        if (currentPage < pages.length - 1) {{
+            currentPage++;
+            updateDisplay();
+        }}
+    }}
+
+    function prevPage() {{
+        if (currentPage > 0) {{
+            currentPage--;
+            updateDisplay();
+        }}
+    }}
+
+    function changeMode() {{
+        updateDisplay();
     }}
 
     // Voces del sistema
@@ -576,6 +666,13 @@ def render_tts_player(text, key_suffix=""):
         
         utterance.onboundary = function(e) {{
             var idx = getWordIndexFromCharIndex(e.charIndex);
+            if (idx !== -1 && wordObjects[idx]) {{
+                var targetPage = wordObjects[idx].pageIndex;
+                if (mode === 'paged' && targetPage !== currentPage) {{
+                    currentPage = targetPage;
+                    updateDisplay();
+                }}
+            }}
             highlightWord(idx);
         }};
         
